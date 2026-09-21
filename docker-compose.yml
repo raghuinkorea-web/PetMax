@@ -1,0 +1,55 @@
+name: adisys-fieldops
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: adisys
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-adisys_dev_pw}
+      POSTGRES_DB: adisys_fieldops
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U adisys -d adisys_fieldops"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  api:
+    build: { context: ., dockerfile: Dockerfile }
+    environment:
+      NODE_ENV: production
+      API_PORT: 4000
+      DATABASE_URL: postgres://adisys:${POSTGRES_PASSWORD:-adisys_dev_pw}@db:5432/adisys_fieldops
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:?set a 48-byte random hex secret}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?set a 48-byte random hex secret}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:8080,http://localhost:8081}
+      STORAGE_LOCAL_PATH: /app/storage
+    volumes:
+      - receipts:/app/storage      # receipts must outlive the container
+    depends_on:
+      db: { condition: service_healthy }
+    restart: unless-stopped
+
+  admin:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+      args: { APP: admin }
+    ports: ["8080:80"]
+    depends_on: [api]
+    restart: unless-stopped
+
+  employee:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+      args: { APP: employee }
+    ports: ["8081:80"]
+    depends_on: [api]
+    restart: unless-stopped
+
+volumes:
+  db-data:
+  receipts:

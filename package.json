@@ -1,0 +1,20 @@
+{
+  "name": "adisys-fieldops",
+  "version": "1.0.0",
+  "private": true,
+  "description": "ADISYS FieldOps — On-Field Employee Productivity, Project & Expense Management Platform",
+  "workspaces": ["packages/*", "apps/*"],
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "db:migrate": "node --env-file=.env apps/api/scripts/migrate.mjs",
+    "db:seed": "node --env-file=.env apps/api/scripts/seed.mjs",
+    "db:reset": "node --env-file=.env apps/api/scripts/migrate.mjs --reset && npm run db:seed",
+    "dev:api": "npm run dev -w @adisys/api",
+    "dev:admin": "npm run dev -w @adisys/admin",
+    "dev:employee": "npm run dev -w @adisys/employee",
+    "dev": "node scripts/dev-all.mjs",
+    "build": "npm run build -w @adisys/shared && npm run build -w @adisys/api && npm run build -w @adisys/admin && npm run build -w @adisys/employee",
+    "test": "npm run test -w @adisys/api",
+    "typecheck": "npm run typecheck --workspaces --if-present"
+  }
+}

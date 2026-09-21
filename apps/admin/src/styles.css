@@ -1,0 +1,147 @@
+@import "tailwindcss";
+
+/* =====================================================================
+   ADISYS FieldOps — design system
+   ---------------------------------------------------------------------
+   Brand red is reserved for ADISYS identity and the single primary
+   action on a screen. Operational meaning is carried by a separate,
+   deliberately desaturated status palette, so "this is ADISYS" and
+   "this went wrong" never look like the same thing.
+
+   Every token lives in @theme, so each one is a real utility class
+   (bg-card, text-danger, ring-line, rounded-card, shadow-raised …).
+   ===================================================================== */
+
+@theme {
+  /* --- ADISYS brand red, sampled from the wordmark --------------- */
+  --color-brand-50:  #fff1f1;
+  --color-brand-100: #ffe0e1;
+  --color-brand-200: #ffc5c7;
+  --color-brand-300: #ff9ca1;
+  --color-brand-400: #f9636b;
+  --color-brand-500: #e3131b;
+  --color-brand-600: #c21017;
+  --color-brand-700: #a10e14;
+  --color-brand-800: #851116;
+  --color-brand-900: #6f1317;
+
+  /* --- Graphite: navigation, headings, body text ------------------ */
+  --color-ink-50:  #f6f7f9;
+  --color-ink-100: #eceef2;
+  --color-ink-200: #d6dae2;
+  --color-ink-300: #b2bac8;
+  --color-ink-400: #8792a5;
+  --color-ink-500: #67748a;
+  --color-ink-600: #515c70;
+  --color-ink-700: #424b5c;
+  --color-ink-800: #2b323e;
+  --color-ink-900: #12161c;
+  --color-ink-950: #0a0d11;
+
+  /* --- Surfaces and lines ---------------------------------------- */
+  --color-surface:     #f4f6f8;
+  --color-card:        #ffffff;
+  --color-sunken:      #eef1f4;
+  --color-line:        #e4e8ed;
+  --color-line-strong: #cfd6de;
+
+  /* --- Status palette: meaning, never brand ---------------------- */
+  --color-success:      #06703f;
+  --color-success-soft: #e6f5ec;
+  --color-warning:      #96590a;
+  --color-warning-soft: #fdf3e2;
+  --color-info:         #1a55bd;
+  --color-info-soft:    #e9f0fd;
+  --color-progress:     #0b6c86;
+  --color-progress-soft:#e3f3f8;
+  --color-danger:       #ad2027;
+  --color-danger-soft:  #fdeceb;
+  --color-muted:        #55606e;
+  --color-muted-soft:   #eef0f3;
+
+  /* --- Chart palette -------------------------------------------- 
+     Validated with the data-viz palette checker against a white card
+     surface: lightness band, chroma floor, adjacent-pair CVD separation
+     (worst ΔE 9.1 protan) and the normal-vision floor (worst ΔE 22.9)
+     all pass. Two slots sit below 3:1 contrast, so every chart using
+     them ships a legend plus a "View as table" fallback.            */
+  --color-chart-1: #2a78d6;   /* blue    — recorded / assigned      */
+  --color-chart-2: #eb6834;   /* orange                             */
+  --color-chart-3: #1baf7a;   /* aqua    — verified / approved      */
+  --color-chart-4: #eda100;   /* amber   — pending                  */
+  --color-chart-5: #e87ba4;   /* magenta                            */
+  --color-chart-6: #008300;   /* green                              */
+  --color-chart-7: #4a3aa7;   /* violet                             */
+  --color-chart-rejected: #ad2027;
+  --color-chart-grid: #e9edf1;
+  --color-chart-axis: #8792a5;
+
+  --font-sans: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+               "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "SF Mono", ui-monospace, "JetBrains Mono", Menlo, Consolas, monospace;
+
+  --radius-card: 0.625rem;
+
+  --shadow-card:    0 1px 2px 0 rgb(18 22 28 / 0.05), 0 1px 3px 0 rgb(18 22 28 / 0.06);
+  --shadow-raised:  0 4px 12px -2px rgb(18 22 28 / 0.10), 0 2px 6px -2px rgb(18 22 28 / 0.06);
+  --shadow-overlay: 0 18px 40px -12px rgb(18 22 28 / 0.28);
+}
+
+:root { color-scheme: light; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  background: var(--color-surface);
+  color: var(--color-ink-900);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+/* Figures in tables must align on the decimal point. */
+.tabular { font-variant-numeric: tabular-nums; }
+
+/* One focus treatment for anything that does not style its own focus.
+   Form controls are excluded: they carry a focus ring on the control
+   itself, and doubling the two reads as an error state rather than focus. */
+:where(a, button, [tabindex]):focus-visible {
+  outline: 2px solid var(--color-brand-500);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+:where(input, select, textarea):focus-visible { outline: none; }
+
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: var(--color-line-strong);
+  border-radius: 6px;
+  border: 2px solid var(--color-surface);
+}
+::-webkit-scrollbar-thumb:hover { background: var(--color-ink-400); }
+
+@keyframes adisys-fade-up { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+@keyframes adisys-shimmer { 0% { background-position: -400px 0; } 100% { background-position: 400px 0; } }
+
+.animate-fade-up { animation: adisys-fade-up 0.18s ease-out both; }
+
+.skeleton {
+  background: linear-gradient(90deg, var(--color-sunken) 25%, #f8fafb 50%, var(--color-sunken) 75%);
+  background-size: 800px 100%;
+  animation: adisys-shimmer 1.4s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
+
+@media print {
+  .no-print { display: none !important; }
+  body { background: #fff; }
+}

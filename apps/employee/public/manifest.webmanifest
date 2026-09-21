@@ -1,0 +1,21 @@
+{
+  "name": "ADISYS FieldOps",
+  "short_name": "FieldOps",
+  "description": "Daily work, time recording and expense claims for ADISYS field staff.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#12161C",
+  "theme_color": "#12161C",
+  "categories": ["business", "productivity"],
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Today's work", "url": "/work?view=today" },
+    { "name": "Add expense", "url": "/expenses/new" }
+  ]
+}
