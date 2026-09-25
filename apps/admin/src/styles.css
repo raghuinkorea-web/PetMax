@@ -1,4 +1,7 @@
 @import "tailwindcss";
+/* Barlow / Barlow Condensed are used only by the sign-in screen, which follows
+   the "Industry" design system rather than the product's Inter-based one. */
+@import url('https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;700&family=Barlow+Condensed:wght@400;600&display=swap');
 
 /* =====================================================================
    ADISYS FieldOps — design system
@@ -37,6 +40,14 @@
   --color-ink-800: #2b323e;
   --color-ink-900: #12161c;
   --color-ink-950: #0a0d11;
+
+  /* --- Sign-in page ----------------------------------------------
+     A light blue field the whole sign-in screen sits on. Lighter than
+     the cornflower app surface, so signing in reads as a different
+     place from the product, and light enough to carry dark text:
+     ink-900 is 14.5:1 on it and ink-600 is 5.4:1. Brand red only
+     reaches 3.9:1, so small red text uses brand-600 (5.0:1).        */
+  --color-signin: #dbe7fa;
 
   /* --- Navy: the side navigation panel ---------------------------
      A surface colour of its own rather than a retint of ink-900, which
@@ -176,3 +187,90 @@ body {
   .no-print { display: none !important; }
   body { background: #fff; }
 }
+
+/* =====================================================================
+   Sign-in screen — the "Industry" design system
+   ---------------------------------------------------------------------
+   Scoped entirely under .industry so it cannot leak into the product,
+   which keeps its own Inter/red identity. Components are wireframe
+   objects: square, transparent, hairline-bordered, with registration
+   marks at the corners.
+   ===================================================================== */
+.industry {
+  --i-bg:        #f2f2f3;
+  --i-surface:   #e9e9ea;
+  --i-text:      #1d1f20;
+  --i-accent:    #5980a6;
+  --i-accent-600:#597ea3;
+  --i-accent-700:#416180;
+  --i-neutral-700:#5d5d60;
+  --i-divider:   color-mix(in srgb, #1d1f20 11%, transparent);
+
+  --i-heading: "Barlow Condensed", system-ui, sans-serif;
+  --i-body:    "Barlow", system-ui, sans-serif;
+
+  --i-space-1: 3.4px;  --i-space-2: 6.8px;  --i-space-3: 10.2px;
+  --i-space-4: 13.6px; --i-space-6: 20.4px; --i-space-8: 27.2px;
+
+  background: var(--i-bg);
+  color: var(--i-text);
+  font-family: var(--i-body);
+  font-size: 15px;
+  line-height: 1.55;
+}
+
+/* — blueprint frame and its registration marks — */
+.industry .blueprint { position: relative; border: 1px solid var(--i-divider); border-radius: 0; }
+.industry .corner {
+  position: absolute; width: 11px; height: 11px;
+  color: color-mix(in srgb, var(--i-text) 55%, transparent);
+}
+.industry .corner::before,
+.industry .corner::after { content: ""; position: absolute; background: currentColor; }
+.industry .corner::before { left: 5px; top: 0; width: 1px; height: 100%; }
+.industry .corner::after  { top: 5px; left: 0; width: 100%; height: 1px; }
+.industry .corner.tl { top: -6px; left: -6px; }
+.industry .corner.tr { top: -6px; right: -6px; }
+.industry .corner.bl { bottom: -6px; left: -6px; }
+.industry .corner.br { bottom: -6px; right: -6px; }
+
+/* — form controls — */
+.industry .i-field > label {
+  display: block; font-size: 11px; margin-bottom: 7px;
+  letter-spacing: 0.10em; text-transform: uppercase;
+  color: color-mix(in srgb, var(--i-text) 58%, transparent);
+}
+.industry .i-input {
+  width: 100%; min-height: 44px; padding: 10px 13px; font: inherit; font-size: 14px;
+  transition: border-color 0.15s ease, background 0.15s ease;
+  color: var(--i-text); caret-color: var(--i-accent);
+  background: var(--i-surface);
+  border: 1px solid var(--i-divider); border-radius: 0;
+}
+.industry .i-input::placeholder { color: color-mix(in srgb, var(--i-text) 45%, transparent); }
+.industry .i-input:hover { border-color: color-mix(in srgb, var(--i-text) 30%, transparent); }
+.industry .i-input:focus-visible { border-color: var(--i-accent); outline: none; }
+.industry .i-input[aria-invalid="true"] { border-color: #ad2027; }
+
+/* — buttons — */
+.industry .i-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  cursor: pointer; text-decoration: none;
+  font-family: var(--i-heading); font-weight: 600; font-size: 15px; line-height: 1.2;
+  letter-spacing: 0.14em; text-transform: uppercase;
+  min-height: 46px; padding: var(--i-space-2) calc(var(--i-space-3) * 1.2);
+  transition: background 0.15s ease, border-color 0.15s ease;
+  border: 1px solid var(--i-divider); border-radius: 0;
+  background: transparent; color: var(--i-text);
+}
+.industry .i-btn-primary {
+  background: var(--i-accent); border-color: var(--i-accent); color: var(--i-bg);
+}
+.industry .i-btn-primary:hover:not(:disabled) { background: var(--i-accent-600); }
+.industry .i-btn-primary:active:not(:disabled) { background: var(--i-accent-700); }
+.industry .i-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.industry .i-btn-block { width: 100%; margin-top: var(--i-space-2); }
+
+.industry a { color: var(--i-accent-700); text-underline-offset: 3px; }
+.industry a:hover { color: #1d2d3d; }
+.industry :focus-visible { outline: 2px solid var(--i-accent); outline-offset: 2px; }
