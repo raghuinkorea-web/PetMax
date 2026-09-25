@@ -94,7 +94,7 @@ export function ReportsPage() {
               <div className="p-2">
                 {Object.entries(grouped).map(([group, items]) => (
                   <div key={group} className="mb-2">
-                    <p className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-ink-400">
+                    <p className="px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-ink-400">
                       {group}
                     </p>
                     <ul>
@@ -175,7 +175,7 @@ export function ReportsPage() {
                     <thead className="sticky top-0 z-10 bg-sunken">
                       <tr>
                         {columns.map((c, i) => (
-                          <th key={c} className={cx('whitespace-nowrap px-3 py-2.5 text-xs font-medium text-ink-600',
+                          <th key={c} className={cx('whitespace-nowrap px-3 py-2.5 text-sm font-bold text-ink-600',
                             i > 0 && 'text-right')}>
                             {humanise(c)}
                           </th>

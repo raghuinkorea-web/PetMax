@@ -223,12 +223,12 @@ function ExpenseCategories({ editable }: { editable: boolean }) {
         <table className="w-full min-w-[720px] text-left text-sm">
           <thead>
             <tr className="border-y border-line bg-sunken/60">
-              <th className="px-5 py-2.5 text-xs font-medium text-ink-600">Category</th>
-              <th className="px-3 py-2.5 text-xs font-medium text-ink-600">Form</th>
-              <th className="px-3 py-2.5 text-xs font-medium text-ink-600">Receipt</th>
-              <th className="px-3 py-2.5 text-xs font-medium text-ink-600">Project</th>
-              <th className="px-3 py-2.5 text-right text-xs font-medium text-ink-600">Per-claim limit</th>
-              <th className="px-5 py-2.5 text-right text-xs font-medium text-ink-600">Daily limit</th>
+              <th className="px-5 py-2.5 text-sm font-bold text-ink-600">Category</th>
+              <th className="px-3 py-2.5 text-sm font-bold text-ink-600">Form</th>
+              <th className="px-3 py-2.5 text-sm font-bold text-ink-600">Receipt</th>
+              <th className="px-3 py-2.5 text-sm font-bold text-ink-600">Project</th>
+              <th className="px-3 py-2.5 text-right text-sm font-bold text-ink-600">Per-claim limit</th>
+              <th className="px-5 py-2.5 text-right text-sm font-bold text-ink-600">Daily limit</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-line">
@@ -288,11 +288,11 @@ function ExpensePolicies() {
           <table className="w-full min-w-[760px] text-left text-sm">
             <thead>
               <tr className="border-y border-line bg-sunken/60">
-                <th className="px-5 py-2.5 text-xs font-medium text-ink-600">Policy</th>
-                <th className="px-3 py-2.5 text-xs font-medium text-ink-600">Applies to</th>
-                <th className="px-3 py-2.5 text-right text-xs font-medium text-ink-600">Amount band</th>
-                <th className="px-3 py-2.5 text-xs font-medium text-ink-600">Route</th>
-                <th className="px-5 py-2.5 text-right text-xs font-medium text-ink-600">Priority</th>
+                <th className="px-5 py-2.5 text-sm font-bold text-ink-600">Policy</th>
+                <th className="px-3 py-2.5 text-sm font-bold text-ink-600">Applies to</th>
+                <th className="px-3 py-2.5 text-right text-sm font-bold text-ink-600">Amount band</th>
+                <th className="px-3 py-2.5 text-sm font-bold text-ink-600">Route</th>
+                <th className="px-5 py-2.5 text-right text-sm font-bold text-ink-600">Priority</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-line">

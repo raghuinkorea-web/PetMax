@@ -1,20 +1,46 @@
 /**
  * ADISYS wordmark.
  *
- * This is a faithful typographic reconstruction of the ADISYS logo —
- * heavy italic capitals in brand red above the "Observation Driven
- * Insights" tagline. To use the official artwork instead, drop the
- * supplied file at `public/adisys-logo.svg` and set
- * `VITE_BRAND_LOGO_URL=/adisys-logo.svg`; the <img> path below then
- * replaces the drawn mark with no other change.
+ * The official artwork ships in `public/`: `adisys-logo.png` is the full
+ * lockup, `adisys-wordmark.png` the lettering on its own for places too
+ * short to carry the tagline. Either can be overridden with
+ * VITE_BRAND_LOGO_URL / VITE_BRAND_WORDMARK_URL. The drawn mark below is
+ * the fallback — a typographic reconstruction used only if both are
+ * explicitly blanked.
+ *
+ * Sizing note: callers pass the same `height` the drawn mark took, and the
+ * full lockup renders at height * LOCKUP_RATIO so it occupies exactly the
+ * vertical space the drawn mark did — the layouts are tuned around that.
+ * Because the real artwork gives more of its height to the lettering, the
+ * letters come out slightly larger than the reconstruction at the same
+ * setting, which is the point. Without the tagline, `height` is the height
+ * of the lettering itself.
  */
-const OFFICIAL_LOGO = import.meta.env.VITE_BRAND_LOGO_URL as string | undefined;
+const OFFICIAL_LOGO = (import.meta.env.VITE_BRAND_LOGO_URL ?? '/adisys-logo.png') as string;
+const OFFICIAL_WORDMARK = (import.meta.env.VITE_BRAND_WORDMARK_URL ?? '/adisys-wordmark.png') as string;
+
+/** Matches the drawn mark's footprint (its svg rendered at height * 1.35). */
+const LOCKUP_RATIO = 1.35;
 
 export function Wordmark({ height = 28, variant = 'colour', showTagline = true }: {
   height?: number; variant?: 'colour' | 'mono-light'; showTagline?: boolean;
 }) {
-  if (OFFICIAL_LOGO) {
-    return <img src={OFFICIAL_LOGO} alt="ADISYS" style={{ height }} className="w-auto" />;
+  const official = showTagline ? OFFICIAL_LOGO : OFFICIAL_WORDMARK;
+  if (official) {
+    return (
+      <img
+        src={official}
+        alt="ADISYS — Observation Driven Insights"
+        style={{
+          height: showTagline ? height * LOCKUP_RATIO : height,
+          // The artwork is red on near-black. On dark surfaces that tagline
+          // would disappear, so knock the whole mark out to white, which is
+          // what the drawn mono-light variant does too.
+          filter: variant === 'mono-light' ? 'brightness(0) invert(1)' : undefined,
+        }}
+        className="w-auto shrink-0"
+      />
+    );
   }
 
   const red = variant === 'mono-light' ? '#ffffff' : 'var(--color-brand-500)';
@@ -40,14 +66,27 @@ export function Wordmark({ height = 28, variant = 'colour', showTagline = true }
   );
 }
 
-/** Compact square mark for collapsed navigation and the mobile header. */
-export function BrandMark({ size = 32 }: { size?: number }) {
+/**
+ * Compact mark for the collapsed navigation rail, where the full lockup does
+ * not fit: the "A" of the official wordmark, cropped from the same artwork so
+ * it is the real letterform rather than a drawn stand-in. `height` is the
+ * letter's height, matching what `Wordmark` means by it.
+ */
+const OFFICIAL_MARK = (import.meta.env.VITE_BRAND_MARK_URL ?? '/adisys-mark.png') as string;
+
+export function BrandMark({ height = 22, variant = 'colour' }: {
+  height?: number; variant?: 'colour' | 'mono-light';
+}) {
   return (
-    <span aria-hidden
-      className="inline-flex shrink-0 items-center justify-center rounded-lg bg-ink-900 font-bold italic text-brand-500"
-      style={{ height: size, width: size, fontSize: size * 0.52 }}>
-      A
-    </span>
+    <img
+      src={OFFICIAL_MARK}
+      alt="ADISYS"
+      style={{
+        height,
+        filter: variant === 'mono-light' ? 'brightness(0) invert(1)' : undefined,
+      }}
+      className="w-auto shrink-0"
+    />
   );
 }
 

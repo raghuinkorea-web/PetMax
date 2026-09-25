@@ -10,6 +10,7 @@ import {
 } from '@adisys/shared';
 import { api } from '../lib/api';
 import { useAuth } from '../lib/auth';
+import { Avatar } from '../components/Avatar';
 import { Screen, ScreenHeader } from '../components/Shell';
 import {
   Button, Card, EmptyState, SectionTitle, Skeleton, StatusBadge, cx, useToast,
@@ -70,9 +71,8 @@ export function HomeScreen() {
         title={`${greeting()}, ${firstName}`}
         subtitle={new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' })}
         action={
-          <Link to="/profile" aria-label="Profile"
-            className="flex h-10 w-10 items-center justify-center rounded-full bg-ink-900 text-xs font-semibold text-white">
-            {user?.fullName.split(' ').slice(0, 2).map((p) => p[0]).join('')}
+          <Link to="/profile" aria-label="Profile">
+            <Avatar name={user?.fullName ?? '?'} fileId={user?.avatarFileId} size={40} />
           </Link>
         }
       />
@@ -182,15 +182,15 @@ export function HomeScreen() {
           <Card>
             <dl className="grid grid-cols-3 gap-2 text-center">
               <div>
-                <dt className="text-[11px] text-ink-500">Awaiting decision</dt>
+                <dt className="text-[12px] text-ink-500">Awaiting decision</dt>
                 <dd className="tabular mt-0.5 text-lg font-semibold text-warning">{day.data?.expenses?.pending ?? 0}</dd>
               </div>
               <div>
-                <dt className="text-[11px] text-ink-500">Needs correction</dt>
+                <dt className="text-[12px] text-ink-500">Needs correction</dt>
                 <dd className="tabular mt-0.5 text-lg font-semibold text-danger">{day.data?.expenses?.returned ?? 0}</dd>
               </div>
               <div>
-                <dt className="text-[11px] text-ink-500">Awaiting payment</dt>
+                <dt className="text-[12px] text-ink-500">Awaiting payment</dt>
                 <dd className="tabular mt-0.5 text-lg font-semibold text-success">
                   {money(day.data?.expenses?.awaitingPayment ?? 0, { compact: true })}
                 </dd>
@@ -213,7 +213,7 @@ export function HomeScreen() {
               <Line label="Verified by your manager" value={hours(day.data?.time?.verifiedMinutesThisWeek)}
                     tone="success" hint={METRIC_DEFINITIONS.verified_hours} />
             </dl>
-            <p className="mt-3 border-t border-line pt-3 text-[11px] leading-relaxed text-ink-500">
+            <p className="mt-3 border-t border-line pt-3 text-[12px] leading-relaxed text-ink-500">
               Only hours your manager has verified count as productive time in ADISYS reports.
             </p>
           </Card>
@@ -241,13 +241,13 @@ export function TaskCard({ assignment: a, showDate }: { assignment: any; showDat
         </div>
 
         {a.acknowledgement.changedSinceAck && (
-          <p className="mt-2 flex items-center gap-1.5 rounded-lg bg-warning-soft px-2.5 py-1.5 text-[11px] font-medium text-warning">
+          <p className="mt-2 flex items-center gap-1.5 rounded-lg bg-warning-soft px-2.5 py-1.5 text-[12px] font-medium text-warning">
             <AlertTriangle className="h-3.5 w-3.5 shrink-0" aria-hidden />
             Changed since you acknowledged it — please review again
           </p>
         )}
 
-        <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-ink-500">
+        <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-ink-500">
           {a.locationText && (
             <span className="flex min-w-0 items-center gap-1">
               <MapPin className="h-3 w-3 shrink-0" aria-hidden />
@@ -318,7 +318,7 @@ function TimerStrip({ onChange }: { onChange: () => void }) {
             {hours(timer.data?.recordedMinutesToday ?? 0)}
           </p>
         </div>
-        <p className="text-right text-[11px] leading-tight text-ink-400">
+        <p className="text-right text-[12px] leading-tight text-ink-400">
           Open a task to<br />start its timer
         </p>
       </div>
@@ -348,7 +348,7 @@ function Stat({ label, value, loading, tone }: {
   const colour = tone === 'progress' ? 'text-progress' : tone === 'success' ? 'text-success' : 'text-ink-900';
   return (
     <div className="rounded-2xl bg-card p-3 text-center shadow-card ring-1 ring-line">
-      <p className="text-[11px] text-ink-500">{label}</p>
+      <p className="text-[12px] text-ink-500">{label}</p>
       {loading
         ? <Skeleton className="mx-auto mt-1 h-6 w-8" />
         : <p className={cx('tabular mt-0.5 text-xl font-semibold', colour)}>{value}</p>}

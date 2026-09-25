@@ -149,7 +149,7 @@ export function AccountPage() {
                     {s.isCurrent && <StatusBadge tone="success" dot={false}>This device</StatusBadge>}
                   </p>
                   <p className="truncate text-xs text-ink-500">{s.deviceLabel ?? s.userAgent ?? 'Unknown device'}</p>
-                  <p className="tabular text-[11px] text-ink-400">
+                  <p className="tabular text-[12px] text-ink-400">
                     {s.ipAddress ?? 'unknown IP'} · last used {dateTimeLabel(s.lastUsedAt)}
                   </p>
                 </div>

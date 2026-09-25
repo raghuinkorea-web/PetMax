@@ -1,5 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import { Router } from 'express';
+import multer from 'multer';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 import { config } from '../config.js';
@@ -8,9 +9,15 @@ import { asyncHandler, dateString, offsetOf, pageMeta, paginationSchema, parse, 
 import { badRequest, conflict, forbidden, notFound } from '../lib/errors.js';
 import { can, principalOf, requirePermission } from '../middleware/auth.js';
 import { recordAudit } from '../services/audit.js';
+import { storeFile } from '../services/storage.js';
 import { assertUserVisible, scopeFor, userScopeClause } from '../services/scope.js';
 
 export const employeeRouter = Router();
+
+const uploadAvatar = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: config.storage.maxUploadBytes, files: 1 },
+});
 
 const SELECT_EMPLOYEE = `
   SELECT u.id, u.employee_code AS "employeeCode", u.full_name AS "fullName",
@@ -120,7 +127,12 @@ employeeRouter.get('/:id', asyncHandler(async (req, res) => {
 const employeeSchema = z.object({
   employeeCode: z.string().trim().regex(/^[A-Za-z0-9-]{3,20}$/, 'Use 3–20 letters, digits or hyphens').optional(),
   fullName: z.string().trim().min(2, 'Enter the full name').max(120),
-  email: z.string().trim().email('Enter a valid email address').max(180),
+  // Optional: not every employee record carries an address. An empty string
+  // from a form is normalised to null rather than stored, so the unique index
+  // on lower(email) never sees two blanks.
+  email: z.preprocess(
+    (v) => (typeof v === 'string' && v.trim() === '' ? null : v),
+    z.string().trim().email('Enter a valid email address').max(180).nullish()),
   phone: z.string().trim().regex(/^[6-9]\d{9}$/, 'Enter a 10-digit Indian mobile number'),
   roleId: uuid,
   departmentId: uuid.optional(),
@@ -177,9 +189,20 @@ employeeRouter.post('/', requirePermission('employee.create'), asyncHandler(asyn
   });
 }));
 
+// The optional associations accept null as well as being absent: absent means
+// "leave alone", null means "clear it". Without that an edit form has no way to
+// remove a department or a reporting manager once one has been set.
+const employeePatchSchema = employeeSchema.partial().omit({ employeeCode: true }).extend({
+  departmentId: uuid.nullish(),
+  designationId: uuid.nullish(),
+  baseLocationId: uuid.nullish(),
+  reportingManagerId: uuid.nullish(),
+  dateOfJoining: dateString.nullish(),
+});
+
 employeeRouter.patch('/:id', requirePermission('employee.update'), asyncHandler(async (req, res) => {
   const p = principalOf(req);
-  const body = parse(employeeSchema.partial().omit({ employeeCode: true }), req.body);
+  const body = parse(employeePatchSchema, req.body);
 
   const before = await one<any>(
     `SELECT u.*, r.key AS role_key FROM users u JOIN roles r ON r.id = u.role_id
@@ -271,6 +294,73 @@ employeeRouter.post('/:id/status', requirePermission('employee.deactivate'), asy
   await recordAudit(req, { action: 'employee.status_changed', entityType: 'user', entityId: req.params.id,
     before: { status: before.status }, after: { status: body.status, reason: body.reason } });
   res.json({ ok: true, status: body.status });
+}));
+
+/**
+ * Profile photo.
+ *
+ * Anyone who may edit employees can set another person's photo; everyone may
+ * set their own. The image replaces whatever was there: the previous file row
+ * is left in place rather than deleted, so an audit entry still resolves and a
+ * shared checksum is never pulled out from under another record.
+ */
+async function assertMayEditAvatar(req: any, targetId: string) {
+  const p = principalOf(req);
+  if (p.id === targetId) return;
+  if (!can(req, 'employee.update')) throw forbidden('You cannot change this employee\'s photo.');
+  const target = await one<{ role_key: string }>(
+    `SELECT r.key AS role_key FROM users u JOIN roles r ON r.id = u.role_id
+      WHERE u.id = $1 AND u.deleted_at IS NULL`, [targetId]);
+  if (!target) throw notFound('Employee');
+  if (target.role_key === 'super_admin' && p.roleKey !== 'super_admin') {
+    throw forbidden('Only a Super Admin can edit a Super Admin.');
+  }
+}
+
+employeeRouter.post('/:id/avatar', uploadAvatar.single('avatar'), asyncHandler(async (req, res) => {
+  await assertMayEditAvatar(req, req.params.id);
+  const p = principalOf(req);
+
+  const file = req.file as Express.Multer.File | undefined;
+  if (!file) throw badRequest('Choose an image to upload.', { avatar: ['No file received'] });
+
+  const stored = await storeFile({
+    buffer: file.buffer,
+    originalName: file.originalname,
+    declaredMime: file.mimetype,
+    uploadedBy: p.id,
+    purpose: 'avatar',
+  });
+  // storeFile sniffs the real type from the bytes and also permits PDFs, which
+  // are fine as a receipt but not as a face.
+  if (!stored.mimeType.startsWith('image/')) {
+    throw badRequest('A profile photo must be an image.', { avatar: ['Use a JPG, PNG or WEBP image'] });
+  }
+
+  const before = await one<{ avatar_file_id: string | null }>(
+    `SELECT avatar_file_id FROM users WHERE id = $1 AND deleted_at IS NULL`, [req.params.id]);
+  if (!before) throw notFound('Employee');
+
+  await query(`UPDATE users SET avatar_file_id = $2 WHERE id = $1`, [req.params.id, stored.id]);
+  await recordAudit(req, { action: 'employee.avatar_changed', entityType: 'user', entityId: req.params.id,
+    before: { avatarFileId: before.avatar_file_id }, after: { avatarFileId: stored.id } });
+
+  res.status(201).json({ ok: true, avatarFileId: stored.id });
+}));
+
+employeeRouter.delete('/:id/avatar', asyncHandler(async (req, res) => {
+  await assertMayEditAvatar(req, req.params.id);
+
+  const before = await one<{ avatar_file_id: string | null }>(
+    `SELECT avatar_file_id FROM users WHERE id = $1 AND deleted_at IS NULL`, [req.params.id]);
+  if (!before) throw notFound('Employee');
+  if (!before.avatar_file_id) return res.json({ ok: true, avatarFileId: null });
+
+  await query(`UPDATE users SET avatar_file_id = NULL WHERE id = $1`, [req.params.id]);
+  await recordAudit(req, { action: 'employee.avatar_removed', entityType: 'user', entityId: req.params.id,
+    before: { avatarFileId: before.avatar_file_id }, after: { avatarFileId: null } });
+
+  res.json({ ok: true, avatarFileId: null });
 }));
 
 /** Issue a fresh temporary password. */

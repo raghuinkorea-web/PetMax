@@ -120,7 +120,7 @@ function Snapshot({ title, data }: { title: string; data: unknown }) {
   return (
     <div>
       <p className="mb-1 text-xs font-medium text-ink-700">{title}</p>
-      <pre className="max-h-64 overflow-auto rounded-lg bg-ink-900 p-3 text-[11px] leading-relaxed text-ink-100">
+      <pre className="max-h-64 overflow-auto rounded-lg bg-ink-900 p-3 text-[12px] leading-relaxed text-ink-100">
         {data ? JSON.stringify(data, null, 2) : 'No snapshot recorded'}
       </pre>
     </div>

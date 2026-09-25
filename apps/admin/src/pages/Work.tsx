@@ -82,7 +82,7 @@ export function WorkPage() {
           <div className="flex flex-col items-start gap-1">
             <StatusBadge tone={meta.tone} title={meta.description}>{meta.label}</StatusBadge>
             {a.acknowledgement.changedSinceAck && (
-              <span className="flex items-center gap-1 text-[11px] font-medium text-warning">
+              <span className="flex items-center gap-1 text-[12px] font-medium text-warning">
                 <AlertTriangle className="h-3 w-3" /> Changed since acknowledged
               </span>
             )}
@@ -446,21 +446,21 @@ function AssignmentDrawer({ id, onClose }: { id: string; onClose: () => void }) 
 
           {a.description && (
             <section>
-              <h3 className="text-xs font-medium text-ink-700">Description</h3>
+              <h3 className="text-sm font-medium text-ink-700">Description</h3>
               <p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed text-ink-600">{a.description}</p>
             </section>
           )}
 
           {a.instructions && (
             <section className="rounded-lg bg-sunken p-3.5">
-              <h3 className="text-xs font-medium text-ink-700">Site instructions</h3>
+              <h3 className="text-sm font-medium text-ink-700">Site instructions</h3>
               <p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed text-ink-600">{a.instructions}</p>
             </section>
           )}
 
           {a.completionNotes && (
             <section className="rounded-lg bg-info-soft p-3.5 ring-1 ring-inset ring-info/20">
-              <h3 className="text-xs font-medium text-info">Employee's completion note</h3>
+              <h3 className="text-sm font-medium text-info">Employee's completion note</h3>
               <p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed text-ink-700">{a.completionNotes}</p>
             </section>
           )}
@@ -474,7 +474,7 @@ function AssignmentDrawer({ id, onClose }: { id: string; onClose: () => void }) 
           )}
 
           <section>
-            <h3 className="mb-2 text-xs font-medium text-ink-700">Acknowledgement history</h3>
+            <h3 className="mb-2 text-sm font-medium text-ink-700">Acknowledgement history</h3>
             {(query.data?.acknowledgements ?? []).length === 0 ? (
               <p className="rounded-lg bg-sunken px-3 py-2.5 text-xs text-ink-500">
                 Not acknowledged yet — the employee has not confirmed receipt.
@@ -492,7 +492,7 @@ function AssignmentDrawer({ id, onClose }: { id: string; onClose: () => void }) 
                         {ack.mode !== 'individual' && ` (${ack.mode.replace('_', ' ')})`}
                       </p>
                       {ack.reason && <p className="mt-0.5 text-xs text-ink-500">{ack.reason}</p>}
-                      <p className="mt-0.5 text-[11px] text-ink-400">
+                      <p className="mt-0.5 text-[12px] text-ink-400">
                         {new Date(ack.acknowledgedAt).toLocaleString('en-IN')}
                         {ack.deviceLabel && ` · ${ack.deviceLabel}`}
                       </p>
@@ -504,7 +504,7 @@ function AssignmentDrawer({ id, onClose }: { id: string; onClose: () => void }) 
           </section>
 
           <section>
-            <h3 className="mb-2 text-xs font-medium text-ink-700">Activity</h3>
+            <h3 className="mb-2 text-sm font-medium text-ink-700">Activity</h3>
             <ol className="space-y-2 border-l border-line pl-4">
               {(query.data?.events ?? []).map((e: any) => (
                 <li key={e.id} className="relative">
@@ -516,7 +516,7 @@ function AssignmentDrawer({ id, onClose }: { id: string; onClose: () => void }) 
                     {e.actorName && <span className="text-ink-500"> by {e.actorName}</span>}
                   </p>
                   {e.note && <p className="mt-0.5 text-xs text-ink-500">{e.note}</p>}
-                  <p className="text-[11px] text-ink-400">{new Date(e.createdAt).toLocaleString('en-IN')}</p>
+                  <p className="text-[12px] text-ink-400">{new Date(e.createdAt).toLocaleString('en-IN')}</p>
                 </li>
               ))}
             </ol>

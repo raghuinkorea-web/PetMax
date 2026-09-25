@@ -323,10 +323,10 @@ export function ProjectDetailPage() {
                     <table className="w-full min-w-[520px] text-left text-sm">
                       <thead>
                         <tr className="border-y border-line bg-sunken/60">
-                          <th className="px-5 py-2.5 text-xs font-medium text-ink-600">Employee</th>
-                          <th className="px-3 py-2.5 text-right text-xs font-medium text-ink-600">Claims</th>
-                          <th className="px-3 py-2.5 text-right text-xs font-medium text-ink-600">Approved</th>
-                          <th className="px-5 py-2.5 text-right text-xs font-medium text-ink-600">Pending</th>
+                          <th className="px-5 py-2.5 text-sm font-bold text-ink-600">Employee</th>
+                          <th className="px-3 py-2.5 text-right text-sm font-bold text-ink-600">Claims</th>
+                          <th className="px-3 py-2.5 text-right text-sm font-bold text-ink-600">Approved</th>
+                          <th className="px-5 py-2.5 text-right text-sm font-bold text-ink-600">Pending</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-line">
@@ -341,7 +341,7 @@ export function ProjectDetailPage() {
                       </tbody>
                       <tfoot>
                         <tr className="border-t border-line bg-sunken/60">
-                          <td className="px-5 py-2.5 text-xs font-medium text-ink-600">Total</td>
+                          <td className="px-5 py-2.5 text-sm font-bold text-ink-600">Total</td>
                           <td />
                           <td className="tabular px-3 py-2.5 text-right font-semibold text-ink-900">
                             {money(p.approvedExpense)}
@@ -375,7 +375,7 @@ export function ProjectDetailPage() {
                           {e.actorName && <span className="text-ink-500"> by {e.actorName}</span>}
                         </p>
                         {e.note && <p className="mt-0.5 text-xs text-ink-500">{e.note}</p>}
-                        <p className="text-[11px] text-ink-400">{new Date(e.createdAt).toLocaleString('en-IN')}</p>
+                        <p className="text-[12px] text-ink-400">{new Date(e.createdAt).toLocaleString('en-IN')}</p>
                       </li>
                     ))}
                   </ol>

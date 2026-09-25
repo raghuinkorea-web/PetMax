@@ -1,16 +1,107 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  ChevronRight, KeyRound, LogOut, MapPin, Shield, Smartphone, Info,
+  Camera, ChevronRight, KeyRound, LogOut, MapPin, Shield, Smartphone, Info,
 } from 'lucide-react';
-import { dateTimeLabel, hours, initials } from '@adisys/shared';
+import { dateTimeLabel, hours } from '@adisys/shared';
+import { Avatar } from '../components/Avatar';
 import { api, ApiRequestError } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { Screen, ScreenHeader } from '../components/Shell';
 import {
   Button, Card, Field, Input, SectionTitle, Sheet, Skeleton, StatusBadge, cx, useToast,
 } from '../components/ui';
+
+/**
+ * The employee's own photo, with an edit affordance on the avatar itself —
+ * tapping the camera badge opens the device's picker, which on a phone offers
+ * the camera directly. `capture` is deliberately not set: replacing a photo
+ * from the gallery is as common as taking a new one.
+ *
+ * The upload applies immediately, then refreshUser() re-reads /auth/me so the
+ * new face also appears in the home header without a reload.
+ */
+function PhotoEditor({ userId, name, fileId }: {
+  userId?: string; name: string; fileId?: string | null;
+}) {
+  const { refreshUser } = useAuth();
+  const toast = useToast();
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [busy, setBusy] = useState(false);
+  const [confirmRemove, setConfirmRemove] = useState(false);
+
+  const MAX_MB = 10;
+  const ACCEPT = ['image/jpeg', 'image/png', 'image/webp'];
+
+  const choose = async (file: File | undefined) => {
+    if (!file || !userId) return;
+    if (!ACCEPT.includes(file.type)) {
+      toast.error('Unsupported image', 'Use a JPG, PNG or WEBP photo.');
+      return;
+    }
+    if (file.size > MAX_MB * 1024 * 1024) {
+      toast.error('Photo too large', `Photos must be ${MAX_MB} MB or smaller.`);
+      return;
+    }
+    const body = new FormData();
+    body.append('avatar', file);
+    setBusy(true);
+    try {
+      await api.upload(`/employees/${userId}/avatar`, body);
+      await refreshUser();
+      toast.success('Photo updated');
+    } catch (err) {
+      toast.error('Could not upload the photo', (err as Error).message);
+    } finally {
+      setBusy(false);
+      if (inputRef.current) inputRef.current.value = '';
+    }
+  };
+
+  const remove = async () => {
+    if (!userId) return;
+    setBusy(true);
+    try {
+      await api.del(`/employees/${userId}/avatar`);
+      await refreshUser();
+      toast.success('Photo removed');
+    } catch (err) {
+      toast.error('Could not remove the photo', (err as Error).message);
+    } finally {
+      setBusy(false);
+      setConfirmRemove(false);
+    }
+  };
+
+  return (
+    <>
+      <div className="relative shrink-0">
+        <Avatar name={name} fileId={fileId} size={56} className={busy ? 'opacity-50' : undefined} />
+        <button type="button" disabled={busy}
+          onClick={() => (fileId ? setConfirmRemove(true) : inputRef.current?.click())}
+          aria-label={fileId ? 'Change or remove your photo' : 'Add a photo'}
+          className="absolute -bottom-1 -right-1 flex h-6 w-6 items-center justify-center rounded-full
+                     bg-brand-500 text-white ring-2 ring-card active:brightness-90">
+          <Camera className="h-3.5 w-3.5" aria-hidden />
+        </button>
+        <input ref={inputRef} type="file" accept={ACCEPT.join(',')} className="sr-only"
+               onChange={(e) => void choose(e.target.files?.[0])} />
+      </div>
+
+      <Sheet open={confirmRemove} onClose={() => setConfirmRemove(false)} title="Profile photo">
+        <div className="space-y-2.5">
+          <Button block onClick={() => { setConfirmRemove(false); inputRef.current?.click(); }}>
+            Choose a new photo
+          </Button>
+          <Button block variant="danger" loading={busy} onClick={remove}>
+            Remove photo
+          </Button>
+        </div>
+      </Sheet>
+    </>
+  );
+}
 
 export function ProfileScreen() {
   const { user, signOut, refreshUser } = useAuth();
@@ -44,9 +135,7 @@ export function ProfileScreen() {
       <Screen>
         <Card>
           <div className="flex items-center gap-3">
-            <span className="flex h-14 w-14 items-center justify-center rounded-full bg-ink-900 text-lg font-semibold text-white">
-              {user ? initials(user.fullName) : '?'}
-            </span>
+            <PhotoEditor userId={user?.id} name={user?.fullName ?? '?'} fileId={user?.avatarFileId} />
             <div className="min-w-0">
               <p className="truncate text-base font-semibold text-ink-900">{user?.fullName}</p>
               <p className="tabular truncate text-xs text-ink-500">{user?.employeeCode}</p>
@@ -69,20 +158,20 @@ export function ProfileScreen() {
             {day.isLoading ? <Skeleton className="h-16" /> : (
               <dl className="grid grid-cols-2 gap-3 text-center">
                 <div>
-                  <dt className="text-[11px] text-ink-500">Recorded</dt>
+                  <dt className="text-[12px] text-ink-500">Recorded</dt>
                   <dd className="tabular mt-0.5 text-lg font-semibold text-ink-900">
                     {hours(day.data?.time?.recordedMinutesThisWeek)}
                   </dd>
                 </div>
                 <div>
-                  <dt className="text-[11px] text-ink-500">Verified</dt>
+                  <dt className="text-[12px] text-ink-500">Verified</dt>
                   <dd className="tabular mt-0.5 text-lg font-semibold text-success">
                     {hours(day.data?.time?.verifiedMinutesThisWeek)}
                   </dd>
                 </div>
               </dl>
             )}
-            <p className="mt-3 border-t border-line pt-2.5 text-[11px] leading-relaxed text-ink-500">
+            <p className="mt-3 border-t border-line pt-2.5 text-[12px] leading-relaxed text-ink-500">
               Verified hours are the ones your manager has confirmed. Recorded hours that have not been
               verified yet are not counted as productive time.
             </p>
@@ -112,7 +201,7 @@ export function ProfileScreen() {
           Sign out
         </Button>
 
-        <p className="pb-2 text-center text-[11px] text-ink-400">
+        <p className="pb-2 text-center text-[12px] text-ink-400">
           ADISYS FieldOps v1.0 · Observation Driven Insights
         </p>
       </Screen>
@@ -208,7 +297,7 @@ export function DevicesScreen() {
                     {s.isCurrent && <StatusBadge tone="success" dot={false}>This device</StatusBadge>}
                   </p>
                   <p className="truncate text-xs text-ink-500">{s.deviceLabel ?? 'Unknown device'}</p>
-                  <p className="tabular text-[11px] text-ink-400">Last used {dateTimeLabel(s.lastUsedAt)}</p>
+                  <p className="tabular text-[12px] text-ink-400">Last used {dateTimeLabel(s.lastUsedAt)}</p>
                 </div>
                 {!s.isCurrent && (
                   <Button size="sm" loading={revoke.isPending} onClick={() => revoke.mutate(s.id)}>

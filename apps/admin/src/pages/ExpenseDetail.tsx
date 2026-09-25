@@ -194,7 +194,7 @@ export function ExpenseDetailPage() {
                     <span className="ml-1.5 text-xs uppercase tracking-wide text-ink-400">{e.stage}</span>
                   </p>
                   {e.comment && <p className="mt-0.5 text-xs leading-relaxed text-ink-600">{e.comment}</p>}
-                  <p className="mt-0.5 text-[11px] text-ink-400">{dateTimeLabel(e.actedAt)}</p>
+                  <p className="mt-0.5 text-[12px] text-ink-400">{dateTimeLabel(e.actedAt)}</p>
                 </li>
               ))}
             </ol>
@@ -335,7 +335,7 @@ function ReceiptCard({ attachment }: { attachment: any }) {
       <figcaption className="flex items-center justify-between gap-2 border-t border-line px-3 py-2">
         <div className="min-w-0">
           <p className="truncate text-xs font-medium text-ink-800">{attachment.originalName}</p>
-          <p className="text-[11px] text-ink-500">
+          <p className="text-[12px] text-ink-500">
             {Math.round(attachment.sizeBytes / 1024)} KB
             {attachment.ocrStatus === 'completed' && ' · extracted'}
           </p>
@@ -349,8 +349,8 @@ function ReceiptCard({ attachment }: { attachment: any }) {
       </figcaption>
       {attachment.ocrPayload && (
         <div className="border-t border-line bg-info-soft px-3 py-2">
-          <p className="text-[11px] font-medium text-info">Extracted from the receipt — confirmed by the employee before submission</p>
-          <p className="mt-0.5 text-[11px] text-ink-600">
+          <p className="text-[12px] font-medium text-info">Extracted from the receipt — confirmed by the employee before submission</p>
+          <p className="mt-0.5 text-[12px] text-ink-600">
             {attachment.ocrPayload.vendor} · {attachment.ocrPayload.invoiceNo} · {money(attachment.ocrPayload.total)}
           </p>
         </div>

@@ -48,7 +48,7 @@ export function Shell() {
               <li key={tab.to} className="flex-1">
                 <NavLink to={tab.to} end={tab.end}
                   className={({ isActive }) => cx(
-                    'relative flex flex-col items-center gap-0.5 px-1 py-2 text-[11px] font-medium transition-colors',
+                    'relative flex flex-col items-center gap-0.5 px-1 py-2 text-[12px] font-medium transition-colors',
                     isActive ? 'text-brand-600' : 'text-ink-500')}>
                   {({ isActive }: { isActive: boolean }) => (
                     <>
@@ -56,7 +56,7 @@ export function Shell() {
                         <tab.icon className={cx('h-5 w-5', isActive && 'stroke-[2.4]')} aria-hidden />
                         {count > 0 && (
                           <span className="absolute -right-2 -top-1 flex h-4 min-w-4 items-center justify-center
-                                           rounded-full bg-brand-500 px-1 text-[10px] font-bold text-white">
+                                           rounded-full bg-brand-500 px-1 text-[11px] font-bold text-white">
                             {count > 9 ? '9+' : count}
                           </span>
                         )}
@@ -83,7 +83,7 @@ export function ScreenHeader({ title, subtitle, action, sticky = true }: {
       sticky && 'sticky top-0 z-30')}>
       <div className="mx-auto flex max-w-lg items-start justify-between gap-3">
         <div className="min-w-0">
-          <h1 className="truncate text-lg font-semibold tracking-tight text-ink-900">{title}</h1>
+          <h1 className="truncate text-xl font-semibold tracking-tight text-ink-900">{title}</h1>
           {subtitle && <p className="mt-0.5 truncate text-xs text-ink-500">{subtitle}</p>}
         </div>
         {action}

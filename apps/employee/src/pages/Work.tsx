@@ -238,7 +238,7 @@ function BulkAcknowledgeSheet({ scope, onClose, onDone }: {
                     <p className="tabular mt-0.5 truncate text-xs text-ink-500">
                       {a.assignmentCode} · {a.projectName}
                     </p>
-                    <p className="mt-1 text-[11px] text-ink-500">
+                    <p className="mt-1 text-[12px] text-ink-500">
                       {dateLabel(a.assignmentDate, { withYear: false })} · due {dateLabel(a.dueDate, { withYear: false })}
                       {a.estimatedHours ? ` · ${a.estimatedHours}h planned` : ''}
                     </p>
@@ -257,7 +257,7 @@ function Summary({ label, value, tone }: { label: string; value: number | string
   const colour = tone === 'warning' ? 'text-warning' : tone === 'success' ? 'text-success' : 'text-ink-900';
   return (
     <div className="rounded-xl bg-sunken px-2 py-2.5">
-      <dt className="text-[11px] leading-tight text-ink-500">{label}</dt>
+      <dt className="text-[12px] leading-tight text-ink-500">{label}</dt>
       <dd className={cx('tabular mt-0.5 text-lg font-semibold', colour)}>{value}</dd>
     </div>
   );

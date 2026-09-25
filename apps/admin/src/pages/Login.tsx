@@ -133,7 +133,7 @@ export function LoginPage() {
 
           {import.meta.env.DEV && (
             <div className="mt-8 rounded-lg bg-sunken p-3.5 ring-1 ring-line">
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-ink-500">
+              <p className="text-[12px] font-semibold uppercase tracking-wider text-ink-500">
                 Demonstration accounts
               </p>
               <ul className="mt-2 space-y-1">
@@ -154,7 +154,7 @@ export function LoginPage() {
                   </li>
                 ))}
               </ul>
-              <p className="mt-2 px-1.5 text-[11px] text-ink-400">Password: Adisys@2026</p>
+              <p className="mt-2 px-1.5 text-[12px] text-ink-400">Password: Adisys@2026</p>
             </div>
           )}
         </div>

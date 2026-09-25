@@ -38,10 +38,18 @@
   --color-ink-900: #12161c;
   --color-ink-950: #0a0d11;
 
-  /* --- Surfaces and lines ---------------------------------------- */
-  --color-surface:     #f4f6f8;
-  --color-card:        #ffffff;
-  --color-sunken:      #eef1f4;
+  /* --- Surfaces and lines ----------------------------------------
+     `surface` is the page behind the cards; `card` is every panel that
+     sits on it — cards, sheets, the sticky header and bottom bar;
+     `sunken` is a recess inside a card and so must stay a step darker
+     than it.
+
+     Slate rather than white, at a lightness that keeps body text at
+     14.7:1 and secondary text at 5.5:1. Form controls stay white so an
+     input is still distinguishable from the panel behind it.          */
+  --color-surface:     #6495ed;   /* cornflower */
+  --color-card:        #e2e8f0;   /* slate */
+  --color-sunken:      #d6dee8;
   --color-line:        #e4e8ed;
   --color-line-strong: #cfd6de;
 
@@ -80,6 +88,20 @@
                "Helvetica Neue", Arial, sans-serif;
   --font-mono: "SF Mono", ui-monospace, "JetBrains Mono", Menlo, Consolas, monospace;
 
+  /* --- Type scale -------------------------------------------------
+     One step larger than the Tailwind default, applied at the token
+     level so every text-* utility grows at once and the steps between
+     them stay proportional. Only sizes change: spacing and radii have
+     their own tokens, and no font-weight is altered, so bold and
+     semibold read exactly as before — just larger.                   */
+  --text-xs:   0.8125rem;   /* 13px, was 12 */
+  --text-sm:   0.9375rem;   /* 15px, was 14 */
+  --text-base: 1.0625rem;   /* 17px, was 16 */
+  --text-lg:   1.25rem;     /* 20px, was 18 */
+  --text-xl:   1.375rem;    /* 22px, was 20 */
+  --text-2xl:  1.75rem;     /* 28px, was 24 */
+  --text-3xl:  2.125rem;    /* 34px, was 30 */
+
   --radius-card: 0.625rem;
 
   --shadow-card:    0 1px 2px 0 rgb(18 22 28 / 0.05), 0 1px 3px 0 rgb(18 22 28 / 0.06);
@@ -100,7 +122,7 @@ body {
   touch-action: manipulation;
   color: var(--color-ink-900);
   font-family: var(--font-sans);
-  font-size: 14px;
+  font-size: 15px;
   line-height: 1.55;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;

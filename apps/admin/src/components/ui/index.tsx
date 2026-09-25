@@ -97,7 +97,7 @@ export function CardHeader({ title, subtitle, action, tooltip }: {
   return (
     <header className="mb-4 flex items-start justify-between gap-4">
       <div className="min-w-0">
-        <h2 className="flex items-center gap-1.5 text-sm font-semibold text-ink-900">
+        <h2 className="flex items-center gap-1.5 text-base font-semibold text-ink-900">
           {title}
           {tooltip && <InfoTip text={tooltip} />}
         </h2>
@@ -215,7 +215,7 @@ export function ErrorState({ error, onRetry }: { error: unknown; onRetry?: () =>
       <XCircle className="h-8 w-8 text-danger" aria-hidden />
       <div>
         <p className="text-sm font-medium text-ink-800">{message}</p>
-        {requestId && <p className="mt-1 font-mono text-[11px] text-ink-400">Reference {requestId.slice(0, 8)}</p>}
+        {requestId && <p className="mt-1 font-mono text-[12px] text-ink-400">Reference {requestId.slice(0, 8)}</p>}
       </div>
       {onRetry && <Button size="sm" onClick={onRetry}>Try again</Button>}
     </div>
@@ -266,7 +266,7 @@ export function Modal({ open, onClose, title, description, children, footer, siz
         className={cx('animate-fade-up my-auto w-full rounded-xl bg-card shadow-overlay outline-none', width)}>
         <header className="flex items-start justify-between gap-4 border-b border-line px-5 py-4">
           <div>
-            <h2 className="text-sm font-semibold text-ink-900">{title}</h2>
+            <h2 className="text-base font-semibold text-ink-900">{title}</h2>
             {description && <p className="mt-0.5 text-xs text-ink-500">{description}</p>}
           </div>
           <button onClick={onClose} aria-label="Close"
@@ -300,7 +300,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       <div className="pointer-events-none fixed bottom-4 right-4 z-[100] flex w-full max-w-sm flex-col gap-2">
         {toasts.map((t) => (
           <div key={t.id} role="status"
-            className="animate-fade-up pointer-events-auto flex items-start gap-3 rounded-lg bg-white p-3.5
+            className="animate-fade-up pointer-events-auto flex items-start gap-3 rounded-lg bg-card p-3.5
                        shadow-overlay ring-1 ring-line">
             <span className={cx('mt-0.5 rounded-full p-1', TONE_CLASS[t.tone])}>
               {t.tone === 'danger' ? <XCircle className="h-3.5 w-3.5" />
@@ -368,7 +368,7 @@ export function Tabs<T extends string>({ tabs, active, onChange }: {
               : 'border-transparent text-ink-500 hover:border-ink-200 hover:text-ink-800')}>
           {t.label}
           {t.count !== undefined && (
-            <span className={cx('tabular rounded-full px-1.5 py-0.5 text-[11px] font-semibold',
+            <span className={cx('tabular rounded-full px-1.5 py-0.5 text-[12px] font-semibold',
               active === t.key ? 'bg-brand-50 text-brand-600' : 'bg-ink-100 text-ink-500')}>{t.count}</span>
           )}
         </button>

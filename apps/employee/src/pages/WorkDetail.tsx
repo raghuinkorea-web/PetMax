@@ -100,7 +100,7 @@ export function WorkDetailScreen() {
         {/* --- Title and facts -------------------------------- */}
         <Card>
           <div className="flex items-start justify-between gap-2">
-            <h1 className="text-lg font-semibold leading-snug text-ink-900">{a.title}</h1>
+            <h1 className="text-xl font-semibold leading-snug text-ink-900">{a.title}</h1>
             <StatusBadge tone={priority.tone} dot={false}>{priority.label}</StatusBadge>
           </div>
 
@@ -217,9 +217,9 @@ export function WorkDetailScreen() {
                       {new Date(t.startedAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
                       {t.endedAt && ` – ${new Date(t.endedAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}`}
                     </p>
-                    <p className="text-[11px] text-ink-500">{dateLabel(t.startedAt, { withYear: false })}</p>
+                    <p className="text-[12px] text-ink-500">{dateLabel(t.startedAt, { withYear: false })}</p>
                     {t.verificationNote && (
-                      <p className="mt-0.5 text-[11px] leading-relaxed text-danger">{t.verificationNote}</p>
+                      <p className="mt-0.5 text-[12px] leading-relaxed text-danger">{t.verificationNote}</p>
                     )}
                   </div>
                   <div className="shrink-0 text-right">
@@ -234,7 +234,7 @@ export function WorkDetailScreen() {
                 </li>
               ))}
             </ul>
-            <p className="mt-3 border-t border-line pt-2.5 text-[11px] leading-relaxed text-ink-500">
+            <p className="mt-3 border-t border-line pt-2.5 text-[12px] leading-relaxed text-ink-500">
               Recorded time becomes productive hours once your manager verifies it.
             </p>
           </Card>
@@ -288,7 +288,7 @@ function Fact({ icon, term, value, tone, span }: {
 }) {
   return (
     <div className={span ? 'col-span-2' : undefined}>
-      <dt className="flex items-center gap-1 text-[11px] text-ink-500">{icon}{term}</dt>
+      <dt className="flex items-center gap-1 text-[12px] text-ink-500">{icon}{term}</dt>
       <dd className={cx('mt-0.5 text-sm', tone === 'danger' ? 'font-medium text-danger' : 'text-ink-800')}>
         {value}
       </dd>

@@ -70,9 +70,9 @@ export function RolesPage() {
             <table className="w-full min-w-[720px] text-left text-sm">
               <thead className="sticky top-0 bg-sunken">
                 <tr className="border-y border-line">
-                  <th className="px-5 py-2.5 text-xs font-medium text-ink-600">Permission</th>
+                  <th className="px-5 py-2.5 text-sm font-bold text-ink-600">Permission</th>
                   {roles.map((r: any) => (
-                    <th key={r.id} className="px-3 py-2.5 text-center text-xs font-medium text-ink-600">
+                    <th key={r.id} className="px-3 py-2.5 text-center text-sm font-bold text-ink-600">
                       <span className="block">{(ROLE_LABELS as any)[r.key]?.split(' / ')[0] ?? r.name}</span>
                     </th>
                   ))}

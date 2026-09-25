@@ -14,10 +14,18 @@ const SERVICES = [
   { name: 'employee', colour: ESC + '[33m', args: ['run', 'dev', '-w', '@adisys/employee'] },
 ];
 
+// On Windows npm is a .cmd shim, and since Node 20 a .cmd cannot be spawned
+// without a shell. The arguments below are literals, so there is nothing to
+// quote or inject.
+const WINDOWS = process.platform === 'win32';
+
 const children = [];
 
 for (const service of SERVICES) {
-  const child = spawn('npm', service.args, { stdio: ['ignore', 'pipe', 'pipe'] });
+  const child = spawn('npm', service.args, {
+    stdio: ['ignore', 'pipe', 'pipe'],
+    shell: WINDOWS,
+  });
   children.push(child);
 
   const prefix = `${service.colour}[${service.name.padEnd(8)}]${RESET} `;

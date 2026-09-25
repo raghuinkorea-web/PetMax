@@ -1,15 +1,16 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  ArrowLeft, BadgeCheck, Copy, KeyRound, Mail, MapPin, Phone, Power, Timer, UserCog,
+  ArrowLeft, BadgeCheck, Camera, Copy, KeyRound, Mail, MapPin, Phone, Power, Timer, UserCog,
 } from 'lucide-react';
 import {
-  EMPLOYEE_STATUS, METRIC_DEFINITIONS, WORK_STATUS, dateLabel, hours, initials, money,
+  EMPLOYEE_STATUS, METRIC_DEFINITIONS, WORK_STATUS, dateLabel, hours, money,
   type EmployeeStatus, type WorkStatus,
 } from '@adisys/shared';
 import { api } from '../lib/api';
 import { useAuth } from '../lib/auth';
+import { Avatar } from '../components/Avatar';
 import { PageHeader } from '../components/AppShell';
 import {
   Button, Card, CardHeader, ErrorState, InfoTip, Modal, Select, Skeleton, StatusBadge,
@@ -34,6 +35,62 @@ export function EmployeeDetailPage() {
     queryFn: () => api.get('/expenses', { userId: id, size: 15 }),
     enabled: tab === 'expenses',
   });
+
+  /* --- Profile photo -------------------------------------------------
+     Same rule the API enforces: anyone with employee.update may change
+     another person's photo, and only a Super Admin may touch a Super
+     Admin's. Editing your own is always allowed. */
+  const photoRef = useRef<HTMLInputElement>(null);
+  const [photoBusy, setPhotoBusy] = useState(false);
+  const PHOTO_ACCEPT = ['image/jpeg', 'image/png', 'image/webp'];
+  const PHOTO_MAX_MB = 10;
+  const mayEditPhoto = Boolean(e) && (
+    e.id === user?.id ||
+    (can('employee.update') && (e.roleKey !== 'super_admin' || user?.roleKey === 'super_admin'))
+  );
+
+  const afterPhoto = async () => {
+    await qc.invalidateQueries({ queryKey: ['employee', id] });
+    void qc.invalidateQueries({ queryKey: ['employees'] });
+  };
+
+  const choosePhoto = async (file: File | undefined) => {
+    if (!file) return;
+    if (!PHOTO_ACCEPT.includes(file.type)) {
+      toast.error('Unsupported image', 'Use a JPG, PNG or WEBP file.');
+      return;
+    }
+    if (file.size > PHOTO_MAX_MB * 1024 * 1024) {
+      toast.error('Image too large', `Photos must be ${PHOTO_MAX_MB} MB or smaller.`);
+      return;
+    }
+    const body = new FormData();
+    body.append('avatar', file);
+    setPhotoBusy(true);
+    try {
+      await api.upload(`/employees/${id}/avatar`, body);
+      await afterPhoto();
+      toast.success('Photo updated');
+    } catch (err) {
+      toast.error('Could not upload the photo', (err as Error).message);
+    } finally {
+      setPhotoBusy(false);
+      if (photoRef.current) photoRef.current.value = '';
+    }
+  };
+
+  const removePhoto = async () => {
+    setPhotoBusy(true);
+    try {
+      await api.del(`/employees/${id}/avatar`);
+      await afterPhoto();
+      toast.success('Photo removed');
+    } catch (err) {
+      toast.error('Could not remove the photo', (err as Error).message);
+    } finally {
+      setPhotoBusy(false);
+    }
+  };
 
   const resetCredentials = useMutation({
     mutationFn: () => api.post(`/employees/${id}/reset-credentials`),
@@ -90,9 +147,24 @@ export function EmployeeDetailPage() {
             ) : e && (
               <>
                 <div className="flex items-center gap-3">
-                  <span className="relative flex h-14 w-14 items-center justify-center rounded-full bg-ink-900 text-lg font-semibold text-white">
-                    {initials(e.fullName)}
-                    {e.onDuty && <span className="absolute -bottom-0.5 -right-0.5 h-4 w-4 rounded-full bg-success ring-2 ring-white" />}
+                  <span className="relative shrink-0">
+                    <Avatar name={e.fullName} fileId={e.avatarFileId} size={56}
+                            className={photoBusy ? 'opacity-50' : undefined} />
+                    {/* On duty moves to the top so the edit control can own the
+                        bottom corner without either signal displacing the other. */}
+                    {e.onDuty && (
+                      <span title="On duty"
+                        className="absolute -right-0.5 -top-0.5 h-3.5 w-3.5 rounded-full bg-success ring-2 ring-card" />
+                    )}
+                    {mayEditPhoto && (
+                      <button type="button" disabled={photoBusy}
+                        onClick={() => photoRef.current?.click()}
+                        title="Edit photo" aria-label={`Edit ${e.fullName}'s photo`}
+                        className="absolute -bottom-1 -right-1 flex h-6 w-6 items-center justify-center
+                                   rounded-full bg-brand-500 text-white ring-2 ring-card hover:brightness-110">
+                        <Camera className="h-3.5 w-3.5" aria-hidden />
+                      </button>
+                    )}
                   </span>
                   <div className="min-w-0">
                     <p className="truncate font-semibold text-ink-900">{e.fullName}</p>
@@ -105,8 +177,25 @@ export function EmployeeDetailPage() {
                   </div>
                 </div>
 
+                {mayEditPhoto && (
+                  <div className="mt-3 flex items-center gap-3 text-xs">
+                    <button type="button" disabled={photoBusy} onClick={() => photoRef.current?.click()}
+                      className="font-medium text-ink-600 hover:text-ink-900 disabled:opacity-60">
+                      {e.avatarFileId ? 'Replace photo' : 'Add a photo'}
+                    </button>
+                    {e.avatarFileId && (
+                      <button type="button" disabled={photoBusy} onClick={() => void removePhoto()}
+                        className="font-medium text-danger hover:brightness-110 disabled:opacity-60">
+                        Remove photo
+                      </button>
+                    )}
+                    <input ref={photoRef} type="file" accept={PHOTO_ACCEPT.join(',')} className="sr-only"
+                           onChange={(ev) => void choosePhoto(ev.target.files?.[0])} />
+                  </div>
+                )}
+
                 <dl className="mt-5 space-y-3 border-t border-line pt-4 text-sm">
-                  <Row icon={<Mail className="h-3.5 w-3.5" />} term="Email" value={e.email} />
+                  <Row icon={<Mail className="h-3.5 w-3.5" />} term="Email" value={e.email ?? 'None on record'} />
                   <Row icon={<Phone className="h-3.5 w-3.5" />} term="Mobile" value={e.phone} />
                   <Row icon={<UserCog className="h-3.5 w-3.5" />} term="Role" value={e.roleName} />
                   <Row icon={<MapPin className="h-3.5 w-3.5" />} term="Base location" value={e.baseLocationName ?? '—'} />

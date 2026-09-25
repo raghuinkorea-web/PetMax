@@ -13,7 +13,8 @@ export interface Paginated<T> {
 }
 
 export interface AuthUser {
-  id: string; employeeCode: string; fullName: string; email: string; phone: string;
+  /** `email` is optional: staff may be identified by employee code and mobile only. */
+  id: string; employeeCode: string; fullName: string; email: string | null; phone: string;
   roleKey: RoleKey; roleName: string; permissions: PermissionKey[];
   departmentName: string | null; designationName: string | null;
   avatarFileId: string | null; mustChangePassword: boolean;
@@ -22,7 +23,7 @@ export interface AuthUser {
 export interface LoginResponse { accessToken: string; expiresIn: number; user: AuthUser }
 
 export interface EmployeeSummary {
-  id: string; employeeCode: string; fullName: string; email: string; phone: string;
+  id: string; employeeCode: string; fullName: string; email: string | null; phone: string;
   avatarFileId: string | null; roleKey: RoleKey; roleName: string;
   departmentName: string | null; designationName: string | null; baseLocationName: string | null;
   reportingManagerId: string | null; reportingManagerName: string | null;

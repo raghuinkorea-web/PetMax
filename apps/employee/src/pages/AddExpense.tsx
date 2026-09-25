@@ -179,10 +179,10 @@ export function AddExpenseScreen() {
         {/* --- Receipt capture ------------------------------- */}
         <Card>
           <div className="flex items-baseline justify-between">
-            <h2 className="text-sm font-semibold text-ink-900">
+            <h2 className="text-base font-semibold text-ink-900">
               Bill photo{receiptRequired && <span className="ml-0.5 text-danger">*</span>}
             </h2>
-            <span className="text-[11px] text-ink-500">{attachments.length}/5</span>
+            <span className="text-[12px] text-ink-500">{attachments.length}/5</span>
           </div>
 
           {attachments.length > 0 && (
@@ -192,7 +192,7 @@ export function AddExpenseScreen() {
                   {a.file.type.startsWith('image/')
                     ? <img src={a.url} alt={`Receipt ${i + 1}`} className="h-full w-full object-cover" />
                     : <span className="flex h-full flex-col items-center justify-center gap-1 text-ink-500">
-                        <FileText className="h-6 w-6" aria-hidden /><span className="text-[10px]">PDF</span>
+                        <FileText className="h-6 w-6" aria-hidden /><span className="text-[11px]">PDF</span>
                       </span>}
                   <button onClick={() => removeAttachment(i)} aria-label={`Remove receipt ${i + 1}`}
                     className="absolute right-1 top-1 rounded-full bg-ink-900/75 p-1.5 text-white">
@@ -277,7 +277,7 @@ export function AddExpenseScreen() {
         {/* --- Category-specific fields ---------------------- */}
         {variant === 'fuel' && (
           <Card className="space-y-4">
-            <h2 className="text-sm font-semibold text-ink-900">Fuel details</h2>
+            <h2 className="text-base font-semibold text-ink-900">Fuel details</h2>
             <Field label="Vehicle number">
               <Input value={form.vehicleNumber} autoCapitalize="characters"
                      onChange={set('vehicleNumber')} placeholder="TS09 EA 4471" />
@@ -306,7 +306,7 @@ export function AddExpenseScreen() {
 
         {variant === 'food' && (
           <Card className="space-y-4">
-            <h2 className="text-sm font-semibold text-ink-900">Meal details</h2>
+            <h2 className="text-base font-semibold text-ink-900">Meal details</h2>
             <Field label="Meal">
               <OptionGrid value={form.mealType as any} columns={2}
                 onChange={(v) => setForm((f) => ({ ...f, mealType: v }))}
@@ -325,7 +325,7 @@ export function AddExpenseScreen() {
 
         {(variant === 'purchase' || variant === 'standard') && (
           <Card className="space-y-4">
-            <h2 className="text-sm font-semibold text-ink-900">Bill details</h2>
+            <h2 className="text-base font-semibold text-ink-900">Bill details</h2>
             <Field label="Vendor / shop name">
               <Input value={form.vendorName} onChange={set('vendorName')} placeholder="Balaji Electricals" />
             </Field>
@@ -363,7 +363,7 @@ export function AddExpenseScreen() {
       <div className="safe-bottom fixed inset-x-0 bottom-0 z-40 border-t border-line bg-card px-4 py-3">
         <div className="mx-auto max-w-lg space-y-2">
           {!canSubmit && (
-            <p className="text-center text-[11px] text-ink-500">
+            <p className="text-center text-[12px] text-ink-500">
               {!amountValid ? 'Enter an amount'
                 : !form.description.trim() ? 'Say what the expense was for'
                 : projectRequired && !form.projectId ? 'Select a project'
@@ -429,7 +429,7 @@ function Header({ title, subtitle, onBack }: { title: string; subtitle?: string;
           <ArrowLeft className="h-5 w-5" />
         </button>
         <div className="min-w-0">
-          <h1 className="truncate text-base font-semibold text-ink-900">{title}</h1>
+          <h1 className="truncate text-lg font-semibold text-ink-900">{title}</h1>
           {subtitle && <p className="truncate text-xs text-ink-500">{subtitle}</p>}
         </div>
       </div>

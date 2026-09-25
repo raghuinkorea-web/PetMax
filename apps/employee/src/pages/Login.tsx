@@ -50,7 +50,7 @@ export function LoginScreen() {
 
       {/* Form sheet */}
       <div className="safe-bottom flex-1 rounded-t-3xl bg-card px-6 pb-8 pt-7">
-        <h1 className="text-lg font-semibold text-ink-900">Sign in</h1>
+        <h1 className="text-xl font-semibold text-ink-900">Sign in</h1>
         <p className="mt-1 text-sm text-ink-500">
           Use your ADISYS employee ID or the mobile number registered with your manager.
         </p>
@@ -102,7 +102,7 @@ export function LoginScreen() {
 
         {import.meta.env.DEV && (
           <div className="mt-6 rounded-xl bg-sunken p-3.5">
-            <p className="text-[11px] font-semibold uppercase tracking-wider text-ink-500">Demo accounts</p>
+            <p className="text-[12px] font-semibold uppercase tracking-wider text-ink-500">Demo accounts</p>
             <div className="mt-2 grid grid-cols-2 gap-1.5">
               {['ADI-0005', 'ADI-0006', 'ADI-0009', 'ADI-0012'].map((id) => (
                 <button key={id} type="button"
@@ -112,7 +112,7 @@ export function LoginScreen() {
                 </button>
               ))}
             </div>
-            <p className="mt-2 text-[11px] text-ink-400">Password: Adisys@2026</p>
+            <p className="mt-2 text-[12px] text-ink-400">Password: Adisys@2026</p>
           </div>
         )}
       </div>
@@ -139,7 +139,7 @@ export function ForgotPasswordScreen() {
   return (
     <div className="safe-top safe-bottom flex min-h-dvh flex-col bg-card px-6 pt-10">
       <Wordmark height={26} />
-      <h1 className="mt-8 text-lg font-semibold text-ink-900">Reset your password</h1>
+      <h1 className="mt-8 text-xl font-semibold text-ink-900">Reset your password</h1>
 
       {sent ? (
         <>

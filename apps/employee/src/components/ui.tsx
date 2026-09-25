@@ -75,7 +75,7 @@ export function Card({ children, className, padded = true, as: As = 'div' }: {
 export function SectionTitle({ children, action }: { children: ReactNode; action?: ReactNode }) {
   return (
     <div className="mb-2.5 flex items-center justify-between gap-3 px-1">
-      <h2 className="text-sm font-semibold text-ink-900">{children}</h2>
+      <h2 className="text-base font-semibold text-ink-900">{children}</h2>
       {action}
     </div>
   );
@@ -152,7 +152,7 @@ export function OptionGrid<T extends string>({ value, onChange, options, columns
           <span className={cx('text-sm font-medium', value === o.value ? 'text-brand-700' : 'text-ink-800')}>
             {o.label}
           </span>
-          {o.hint && <span className="text-[11px] leading-tight text-ink-500">{o.hint}</span>}
+          {o.hint && <span className="text-[12px] leading-tight text-ink-500">{o.hint}</span>}
         </button>
       ))}
     </div>
@@ -218,7 +218,7 @@ export function Sheet({ open, onClose, title, description, children, footer }: {
           <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-ink-200 sm:hidden" aria-hidden />
           <div className="flex items-start justify-between gap-3">
             <div>
-              <h2 className="text-base font-semibold text-ink-900">{title}</h2>
+              <h2 className="text-lg font-semibold text-ink-900">{title}</h2>
               {description && <p className="mt-0.5 text-xs leading-relaxed text-ink-500">{description}</p>}
             </div>
             <button onClick={onClose} aria-label="Close"
@@ -253,7 +253,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       <div className="safe-top pointer-events-none fixed inset-x-0 top-0 z-[100] flex flex-col gap-2 p-3">
         {toasts.map((t) => (
           <div key={t.id} role="status"
-            className="animate-fade-up pointer-events-auto flex items-start gap-2.5 rounded-xl bg-white p-3.5
+            className="animate-fade-up pointer-events-auto flex items-start gap-2.5 rounded-xl bg-card p-3.5
                        shadow-overlay ring-1 ring-line">
             <span className={cx('mt-0.5 rounded-full p-1', TONE_CLASS[t.tone])}>
               {t.tone === 'danger' ? <XCircle className="h-3.5 w-3.5" />
@@ -298,7 +298,7 @@ export function SegmentedControl<T extends string>({ options, value, onChange }:
             value === o.value ? 'bg-ink-900 text-white' : 'bg-white text-ink-600 ring-1 ring-line-strong')}>
           {o.label}
           {o.count !== undefined && o.count > 0 && (
-            <span className={cx('tabular rounded-full px-1.5 text-[11px] font-semibold',
+            <span className={cx('tabular rounded-full px-1.5 text-[12px] font-semibold',
               value === o.value ? 'bg-white/20' : 'bg-ink-100')}>{o.count}</span>
           )}
         </button>

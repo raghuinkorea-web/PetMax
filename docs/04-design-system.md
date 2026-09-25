@@ -15,12 +15,27 @@ decisions that were not obvious.
 
 ### The wordmark
 
-`Wordmark` and `BrandMark` render a faithful typographic reconstruction of the
-ADISYS logo — heavy italic capitals in brand red above the tagline.
+`Wordmark` renders the official ADISYS artwork, which ships in each app's
+`public/` directory:
 
-**To use the official artwork**: drop the supplied file at
-`apps/<app>/public/adisys-logo.svg` and set `VITE_BRAND_LOGO_URL=/adisys-logo.svg`.
-Both components then render the real asset with no other change.
+| File | Size | Used when |
+|---|---|---|
+| `adisys-logo.png` | 500 × 128 | the full lockup, wordmark above the tagline |
+| `adisys-wordmark.png` | 410 × 75 | `showTagline={false}` — too short to carry the tagline |
+
+Both are transparent PNGs. `height` is the same figure the earlier drawn mark
+took: the full lockup renders at `height × 1.35` so it occupies the space the
+layouts were built around, and without the tagline `height` is the height of
+the lettering itself.
+
+The artwork is brand red above a near-black tagline, which would disappear on
+the dark `ink-900` panels. `variant="mono-light"` therefore knocks the whole
+mark out to white with `filter: brightness(0) invert(1)` — the same all-white
+treatment the drawn mark used on dark surfaces.
+
+**To substitute different artwork**, set `VITE_BRAND_LOGO_URL` and
+`VITE_BRAND_WORDMARK_URL`. `BrandMark` is a separate drawn square mark and is
+unaffected.
 
 ---
 

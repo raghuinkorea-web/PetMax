@@ -85,7 +85,7 @@ export function ExpensesPage() {
           <div className="flex flex-col items-start gap-1">
             <StatusBadge tone={meta.tone} title={meta.description}>{meta.label}</StatusBadge>
             {c.currentStage && (
-              <span className="text-[11px] text-ink-500">with {c.currentStage}</span>
+              <span className="text-[12px] text-ink-500">with {c.currentStage}</span>
             )}
           </div>
         );

@@ -139,7 +139,7 @@ export function ExpenseDetailScreen() {
                   {e.actorName && <span className="text-ink-500"> · {e.actorName}</span>}
                 </p>
                 {e.comment && <p className="mt-0.5 text-xs leading-relaxed text-ink-600">{e.comment}</p>}
-                <p className="mt-0.5 text-[11px] text-ink-400">{dateTimeLabel(e.actedAt)}</p>
+                <p className="mt-0.5 text-[12px] text-ink-400">{dateTimeLabel(e.actedAt)}</p>
               </li>
             ))}
           </ol>
@@ -187,7 +187,7 @@ function ReceiptThumb({ attachment, claimId, editable, onRemoved }: {
   return (
     <li className="relative aspect-[3/4] overflow-hidden rounded-xl bg-sunken ring-1 ring-line">
       {failed ? (
-        <span className="flex h-full items-center justify-center px-2 text-center text-[11px] text-ink-500">
+        <span className="flex h-full items-center justify-center px-2 text-center text-[12px] text-ink-500">
           Could not load
         </span>
       ) : !url ? (
@@ -200,7 +200,7 @@ function ReceiptThumb({ attachment, claimId, editable, onRemoved }: {
         <a href={url} target="_blank" rel="noreferrer"
            className="flex h-full flex-col items-center justify-center gap-1 text-ink-500">
           <FileText className="h-7 w-7" aria-hidden />
-          <span className="text-[10px]">Open PDF</span>
+          <span className="text-[11px]">Open PDF</span>
         </a>
       )}
       {editable && (
@@ -249,7 +249,7 @@ function AddReceipt({ claimId, onAdded }: { claimId: string; onAdded: () => void
 function Fact({ term, value, span }: { term: string; value: string; span?: boolean }) {
   return (
     <div className={span ? 'col-span-2' : undefined}>
-      <dt className="text-[11px] text-ink-500">{term}</dt>
+      <dt className="text-[12px] text-ink-500">{term}</dt>
       <dd className="mt-0.5 text-sm capitalize text-ink-800">{value}</dd>
     </div>
   );

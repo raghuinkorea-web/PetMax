@@ -135,7 +135,7 @@ export function ChartCard({
             <thead className="sticky top-0 bg-sunken">
               <tr>
                 {table.columns.map((c, i) => (
-                  <th key={c} className={cx('px-3 py-2 font-medium text-ink-600', i > 0 && 'text-right')}>{c}</th>
+                  <th key={c} className={cx('px-3 py-2 text-sm font-bold text-ink-600', i > 0 && 'text-right')}>{c}</th>
                 ))}
               </tr>
             </thead>

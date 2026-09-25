@@ -68,7 +68,7 @@ export function DataTable<T>({
                 )}
                 {columns.map((col) => (
                   <th key={col.key} scope="col" style={{ width: col.width }}
-                    className={cx('px-3 py-2.5 text-xs font-medium text-ink-600',
+                    className={cx('px-3 py-2.5 text-sm font-bold text-ink-600',
                       col.numeric && 'text-right', col.hideBelow && HIDE[col.hideBelow])}>
                     {col.sortable && onSort ? (
                       <button onClick={() => onSort(col.key)}

@@ -148,14 +148,14 @@ function ClaimCard({ claim: c }: { claim: any }) {
           <div className="flex shrink-0 flex-col items-end gap-1.5">
             <StatusBadge tone={meta.tone}>{meta.label}</StatusBadge>
             {c.attachmentCount > 0 && (
-              <span className="flex items-center gap-1 text-[11px] text-ink-400">
+              <span className="flex items-center gap-1 text-[12px] text-ink-400">
                 <Receipt className="h-3 w-3" aria-hidden />{c.attachmentCount}
               </span>
             )}
           </div>
         </div>
         {c.status === 'returned' && (
-          <p className="mt-2 rounded-lg bg-warning-soft px-2.5 py-1.5 text-[11px] font-medium text-warning">
+          <p className="mt-2 rounded-lg bg-warning-soft px-2.5 py-1.5 text-[12px] font-medium text-warning">
             Tap to correct and resubmit
           </p>
         )}
@@ -174,11 +174,11 @@ function Tile({ label, count, amount, tone, loading, onClick }: {
   return (
     <button onClick={onClick}
       className="rounded-2xl bg-card p-3.5 text-left shadow-card ring-1 ring-line active:bg-ink-50">
-      <p className="text-[11px] text-ink-500">{label}</p>
+      <p className="text-[12px] text-ink-500">{label}</p>
       {loading ? <Skeleton className="mt-1 h-6 w-16" /> : (
         <>
           <p className={cx('tabular mt-0.5 text-lg font-semibold', colour)}>{money(amount ?? 0, { compact: true })}</p>
-          <p className="text-[11px] text-ink-400">{count ?? 0} claim{count === 1 ? '' : 's'}</p>
+          <p className="text-[12px] text-ink-400">{count ?? 0} claim{count === 1 ? '' : 's'}</p>
         </>
       )}
     </button>

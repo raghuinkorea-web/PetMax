@@ -89,7 +89,7 @@ export function NotificationsPage() {
                         </StatusBadge>
                       </div>
                       <p className="mt-0.5 text-xs leading-relaxed text-ink-600">{n.body}</p>
-                      <p className="mt-1 text-[11px] text-ink-400">{dateTimeLabel(n.createdAt)}</p>
+                      <p className="mt-1 text-[12px] text-ink-400">{dateTimeLabel(n.createdAt)}</p>
                     </div>
                     {!n.readAt && (
                       <button onClick={(e) => { e.preventDefault(); markRead.mutate(n.id); }}

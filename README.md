@@ -154,11 +154,15 @@ API, both clients, the seed and the tests — so they cannot drift.
 
 ---
 
-## Using the official ADISYS logo
+## The ADISYS logo
 
-The apps ship a faithful typographic reconstruction of the wordmark. To use the
-real artwork, drop it at `apps/<app>/public/adisys-logo.svg` and set
-`VITE_BRAND_LOGO_URL=/adisys-logo.svg`. Nothing else changes.
+Both apps ship the official artwork in their `public/` directory:
+`adisys-logo.png` (the full lockup) and `adisys-wordmark.png` (the lettering
+alone, for places too short to carry the tagline). On dark panels the mark is
+knocked out to white, since the tagline is near-black.
+
+To substitute different artwork, set `VITE_BRAND_LOGO_URL` and
+`VITE_BRAND_WORDMARK_URL`. See [the design system](docs/04-design-system.md#the-wordmark).
 
 ---
 
