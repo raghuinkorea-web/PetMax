@@ -284,6 +284,34 @@ assignmentRouter.post('/', requirePermission('work.create'), asyncHandler(async 
     dates.length = 0; dates.push(...rows.map((r) => r.d));
   }
 
+  /*
+   * Approved leave blocks work. The check runs across every assignee and every
+   * generated date before a single row is written, so a repeating assignment
+   * cannot half-succeed and leave someone with work on a day they are away.
+   * The message names who and when, so the warning is actionable.
+   */
+  const clashes = await query<{ name: string; leave_date: string; type_name: string }>(
+    `SELECT u.full_name AS name, to_char(ald.leave_date, 'YYYY-MM-DD') AS leave_date,
+            ald.leave_type_name AS type_name
+       FROM approved_leave_days ald
+       JOIN users u ON u.id = ald.user_id
+      WHERE ald.user_id = ANY($1::uuid[])
+        AND ald.leave_date = ANY($2::date[])
+      ORDER BY u.full_name, ald.leave_date`,
+    [body.assigneeIds, dates]);
+
+  if (clashes.length) {
+    const byPerson = new Map<string, string[]>();
+    for (const c of clashes) {
+      if (!byPerson.has(c.name)) byPerson.set(c.name, []);
+      byPerson.get(c.name)!.push(c.leave_date);
+    }
+    const detail = [...byPerson.entries()]
+      .map(([name, ds]) => `${name} is on approved leave on ${ds.join(', ')}`)
+      .join('; ');
+    throw conflict(`Work cannot be assigned on approved leave dates. ${detail}.`, 'LEAVE_CONFLICT');
+  }
+
   const created = await tx(async (client) => {
     const out: any[] = [];
     const dayOffset = (d: string) =>

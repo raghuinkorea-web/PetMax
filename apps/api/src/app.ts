@@ -14,6 +14,7 @@ import { projectRouter } from './routes/projects.js';
 import { assignmentRouter } from './routes/assignments.js';
 import { timeRouter } from './routes/time.js';
 import { expenseRouter } from './routes/expenses.js';
+import { leaveRouter } from './routes/leave.js';
 import { fileRouter } from './routes/files.js';
 import { dashboardRouter } from './routes/dashboard.js';
 import { reportRouter } from './routes/reports.js';
@@ -87,6 +88,7 @@ export function createApp() {
   app.use('/api/assignments', assignmentRouter);
   app.use('/api/time', timeRouter);
   app.use('/api/expenses', expenseRouter);
+  app.use('/api/leave', leaveRouter);
   app.use('/api/files', fileRouter);
   app.use('/api/dashboard', dashboardRouter);
   app.use('/api/reports', reportRouter);

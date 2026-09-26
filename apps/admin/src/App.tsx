@@ -15,6 +15,8 @@ import { ProductivityPage } from './pages/Productivity';
 import { ExpensesPage } from './pages/Expenses';
 import { ExpenseDetailPage } from './pages/ExpenseDetail';
 import { ApprovalsPage } from './pages/Approvals';
+import { LeaveCalendarPage } from './pages/LeaveCalendar';
+import { LeaveRequestsPage } from './pages/LeaveRequests';
 import { ReportsPage } from './pages/Reports';
 import { SettingsPage } from './pages/Settings';
 import { RolesPage } from './pages/Roles';
@@ -73,6 +75,8 @@ export function App() {
         <Route path="expenses" element={<Guard permissions={['expense.view.own', 'expense.view.team', 'expense.view.all']}><ExpensesPage /></Guard>} />
         <Route path="expenses/:id" element={<ExpenseDetailPage />} />
         <Route path="approvals" element={<Guard permissions={['expense.approve.manager', 'expense.approve.finance']}><ApprovalsPage /></Guard>} />
+        <Route path="leave/calendar" element={<Guard permissions={['leave.view.team', 'leave.view.all']}><LeaveCalendarPage /></Guard>} />
+        <Route path="leave/requests" element={<Guard permissions={['leave.view.team', 'leave.view.all']}><LeaveRequestsPage /></Guard>} />
         <Route path="reports" element={<Guard permissions={['report.view.own', 'report.view.team', 'report.view.all']}><ReportsPage /></Guard>} />
         <Route path="settings" element={<Guard permissions={['settings.view']}><SettingsPage /></Guard>} />
         <Route path="roles" element={<Guard permissions={['rbac.manage']}><RolesPage /></Guard>} />

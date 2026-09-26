@@ -28,6 +28,7 @@ try {
   // -------------------------------------------------------------------
   log('Clearing existing data …');
   await q(`TRUNCATE
+    leave_requests, leave_types,
     reimbursement_items, reimbursement_batches, expense_approvals, expense_attachments,
     expense_claims, expense_policies, expense_categories,
     work_assignment_attachments, work_assignment_events, assignment_acknowledgements,
@@ -310,6 +311,22 @@ try {
   log(`    ${catDefs.length} categories, ${policyDefs.length} approval policies`);
 
   // -------------------------------------------------------------------
+  log('Leave types …');
+  const leaveTypeDefs = [
+    ['casual',      'Casual Leave',      'Short personal absence, planned in advance.',            true,  10],
+    ['sick',        'Sick Leave',        'Illness or medical appointment.',                        true,  20],
+    ['earned',      'Earned Leave',      'Accrued paid leave.',                                    true,  30],
+    ['unpaid',      'Unpaid Leave',      'Approved absence without pay.',                          false, 40],
+    ['compensatory','Compensatory Off',  'Time off in lieu of work on a holiday or rest day.',     true,  50],
+    ['bereavement', 'Bereavement Leave', 'Absence following a death in the family.',               true,  60],
+  ];
+  for (const [key, name, description, isPaid, sortOrder] of leaveTypeDefs) {
+    await q(`INSERT INTO leave_types (key, name, description, is_paid, sort_order)
+             VALUES ($1,$2,$3,$4,$5)`, [key, name, description, isPaid, sortOrder]);
+  }
+  log(`    ${leaveTypeDefs.length} leave types`);
+
+  // -------------------------------------------------------------------
   log('Organisation settings …');
   const settings = [
     ['organization', 'profile', {
@@ -382,6 +399,8 @@ try {
       (SELECT count(*) FROM work_locations)     AS work_locations,
       (SELECT count(*) FROM expense_categories) AS expense_categories,
       (SELECT count(*) FROM expense_policies)   AS expense_policies,
+      (SELECT count(*) FROM leave_types)        AS leave_types,
+      (SELECT count(*) FROM leave_requests)     AS leave_requests,
       (SELECT count(*) FROM projects)           AS projects,
       (SELECT count(*) FROM work_assignments)   AS assignments,
       (SELECT count(*) FROM expense_claims)     AS claims`)).rows[0];

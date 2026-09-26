@@ -38,6 +38,12 @@ const SELECT_EMPLOYEE = `
            WHERE wa.assignee_id = u.id AND wa.deleted_at IS NULL AND wa.status = 'assigned') AS "pendingAckCount",
          EXISTS (SELECT 1 FROM attendance_sessions a
                   WHERE a.user_id = u.id AND a.check_out_at IS NULL) AS "onDuty",
+         -- Approved leave covering today. Read from the same view the leave
+         -- calendar uses, so the badge can never disagree with the calendar.
+         EXISTS (SELECT 1 FROM employees_on_leave_today ol
+                  WHERE ol.user_id = u.id) AS "onLeave",
+         (SELECT ol.leave_type_name FROM employees_on_leave_today ol
+           WHERE ol.user_id = u.id LIMIT 1) AS "onLeaveType",
          EXISTS (SELECT 1 FROM time_entries t
                   WHERE t.user_id = u.id AND t.ended_at IS NULL) AS "timerRunning"
     FROM users u

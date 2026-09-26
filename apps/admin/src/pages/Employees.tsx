@@ -103,7 +103,11 @@ export function EmployeesPage() {
       key: 'status', header: 'Status',
       render: (e) => {
         const meta = EMPLOYEE_STATUS.byValue[e.status as EmployeeStatus];
-        return <StatusBadge tone={meta.tone} title={meta.description}>{meta.label}</StatusBadge>;
+        // Approved leave is shown instead of the account status: it is the more
+        // useful fact today, and it is explicitly not an absence.
+        return e.onLeave
+          ? <StatusBadge tone="info" title={`On approved ${e.onLeaveType ?? 'leave'} today — not absent`}>On Leave</StatusBadge>
+          : <StatusBadge tone={meta.tone} title={meta.description}>{meta.label}</StatusBadge>;
       },
     },
     {

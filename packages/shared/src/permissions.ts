@@ -59,6 +59,13 @@ export const PERMISSIONS = {
   'expense.mark_paid':         { module: 'expense',      description: 'Record reimbursement payment' },
   'expense.edit_approved':     { module: 'expense',      description: 'Amend a claim after approval (restricted)' },
 
+  // Leave
+  'leave.apply':               { module: 'leave',        description: 'Apply for leave and withdraw own pending requests' },
+  'leave.view.own':            { module: 'leave',        description: 'View own leave requests' },
+  'leave.view.team':           { module: 'leave',        description: 'View leave for reports / managed projects' },
+  'leave.view.all':            { module: 'leave',        description: 'View all leave requests and the leave calendar' },
+  'leave.approve':             { module: 'leave',        description: 'Approve or reject leave requests' },
+
   // Reports
   'report.view.own':           { module: 'report',       description: 'Run reports scoped to self' },
   'report.view.team':          { module: 'report',       description: 'Run reports scoped to team/projects' },
@@ -94,6 +101,7 @@ const OPS_MANAGER: PermissionKey[] = [
   'time.log', 'time.verify', 'attendance.record',
   'productivity.view.own', 'productivity.view.team',
   'expense.create', 'expense.view.own', 'expense.view.team', 'expense.approve.manager',
+  'leave.apply', 'leave.view.own', 'leave.view.team', 'leave.approve',
   'report.view.own', 'report.view.team', 'report.export',
   'settings.view',
 ];
@@ -104,6 +112,7 @@ const FINANCE_MANAGER: PermissionKey[] = [
   'project.view.all',
   'expense.create', 'expense.view.own', 'expense.view.all',
   'expense.approve.finance', 'expense.mark_paid',
+  'leave.apply', 'leave.view.own', 'leave.view.all',
   'productivity.view.all',
   'report.view.own', 'report.view.all', 'report.export',
   'settings.view',
@@ -117,6 +126,7 @@ const EMPLOYEE: PermissionKey[] = [
   'time.log', 'attendance.record',
   'productivity.view.own',
   'expense.create', 'expense.view.own',
+  'leave.apply', 'leave.view.own',
   'report.view.own',
 ];
 
@@ -132,7 +142,8 @@ export type DataScope = 'none' | 'own' | 'team' | 'all';
 
 export function resolveScope(
   held: readonly string[],
-  base: 'employee.view' | 'project.view' | 'work.view' | 'productivity.view' | 'expense.view' | 'report.view',
+  base: 'employee.view' | 'project.view' | 'work.view' | 'productivity.view'
+      | 'expense.view' | 'report.view' | 'leave.view',
 ): DataScope {
   const has = (s: string) => held.includes(`${base}.${s}`);
   if (has('all')) return 'all';

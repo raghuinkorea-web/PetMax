@@ -2,9 +2,9 @@ import { useEffect, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
-  BadgeIndianRupee, Bell, CalendarCheck2, ChevronDown, ClipboardList, FileBarChart,
-  FolderKanban, Gauge, LogOut, Menu, MousePointer2, PanelLeft, PanelLeftClose,
-  ScrollText, Settings as SettingsIcon, ShieldCheck, Stamp, Users, X,
+  BadgeIndianRupee, Bell, CalendarCheck2, CalendarDays, ChevronDown, ClipboardList,
+  FileBarChart, FileCheck2, FolderKanban, Gauge, LogOut, Menu, MousePointer2, PanelLeft,
+  PanelLeftClose, ScrollText, Settings as SettingsIcon, ShieldCheck, Stamp, Users, X,
 } from 'lucide-react';
 import type { PermissionKey } from '@adisys/shared';
 import { useAuth } from '../lib/auth';
@@ -18,7 +18,7 @@ interface NavItem {
   label: string;
   icon: typeof Gauge;
   permissions?: PermissionKey[];
-  badge?: 'approvals' | 'notifications';
+  badge?: 'approvals' | 'notifications' | 'leave';
 }
 
 const NAV_GROUPS: Array<{ label: string; items: NavItem[] }> = [
@@ -38,6 +38,15 @@ const NAV_GROUPS: Array<{ label: string; items: NavItem[] }> = [
       { to: '/approvals', label: 'Approval queue', icon: Stamp, badge: 'approvals',
         permissions: ['expense.approve.manager', 'expense.approve.finance'] },
       { to: '/reports', label: 'Reports', icon: FileBarChart, permissions: ['report.view.team', 'report.view.all'] },
+    ],
+  },
+  {
+    label: 'Leave Management',
+    items: [
+      { to: '/leave/calendar', label: 'Leave Calendar', icon: CalendarDays,
+        permissions: ['leave.view.team', 'leave.view.all'] },
+      { to: '/leave/requests', label: 'Leave Requests', icon: FileCheck2, badge: 'leave',
+        permissions: ['leave.view.team', 'leave.view.all'] },
     ],
   },
   {
@@ -119,8 +128,17 @@ export function AppShell() {
     .map((g) => ({ ...g, items: g.items.filter((i) => !i.permissions || can(...i.permissions)) }))
     .filter((g) => g.items.length);
 
+  const leaveQueue = useQuery({
+    queryKey: ['leave', 'pending-count'],
+    queryFn: () => api.get('/leave', { status: 'pending', size: 1 }),
+    enabled: can('leave.view.team', 'leave.view.all'),
+    refetchInterval: 60_000,
+  });
+
   const badgeFor = (item: NavItem) =>
-    item.badge === 'approvals' ? queue?.page?.total ?? 0 : 0;
+    item.badge === 'approvals' ? queue?.page?.total ?? 0
+      : item.badge === 'leave' ? leaveQueue.data?.pendingTotal ?? 0
+      : 0;
 
   // `expanded` only controls what is *visible*: labels stay in the document so
   // the rail remains navigable by screen reader and keyboard.

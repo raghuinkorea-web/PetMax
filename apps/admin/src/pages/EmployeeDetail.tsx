@@ -171,6 +171,11 @@ export function EmployeeDetailPage() {
                     <p className="tabular text-xs text-ink-500">{e.employeeCode}</p>
                     <div className="mt-1.5 flex flex-wrap gap-1.5">
                       {statusMeta && <StatusBadge tone={statusMeta.tone}>{statusMeta.label}</StatusBadge>}
+                      {e.onLeave && (
+                        <StatusBadge tone="info" title={`On approved ${e.onLeaveType ?? 'leave'} today — not absent`}>
+                          On Leave
+                        </StatusBadge>
+                      )}
                       {e.onDuty && <StatusBadge tone="success">On duty</StatusBadge>}
                       {e.timerRunning && <StatusBadge tone="progress">Timer running</StatusBadge>}
                     </div>
