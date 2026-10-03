@@ -19,7 +19,8 @@ export type { DataScope };
 
 export const scopeFor = (
   p: Principal,
-  base: 'employee.view' | 'project.view' | 'work.view' | 'productivity.view' | 'expense.view' | 'report.view',
+  base: 'employee.view' | 'project.view' | 'work.view' | 'productivity.view'
+      | 'expense.view' | 'report.view' | 'leave.view',
 ): DataScope => resolveScope([...p.permissions], base);
 
 /** Recursive reporting line beneath the caller, as an id subquery. */
@@ -48,7 +49,8 @@ export interface ScopeClause { sql: string; params: unknown[] }
  */
 export function userScopeClause(
   p: Principal, userIdColumn: string, startIdx: number,
-  base: 'employee.view' | 'work.view' | 'productivity.view' | 'expense.view' = 'employee.view',
+  base: 'employee.view' | 'work.view' | 'productivity.view' | 'expense.view'
+      | 'leave.view' = 'employee.view',
 ): ScopeClause {
   const scope = scopeFor(p, base);
   switch (scope) {

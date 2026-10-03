@@ -1,6 +1,6 @@
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { Bell, ClipboardList, Home, Receipt, User } from 'lucide-react';
+import { Bell, CalendarDays, ClipboardList, Home, Receipt, User } from 'lucide-react';
 import { initials } from '@adisys/shared';
 import { api } from '../lib/api';
 import { useAuth } from '../lib/auth';
@@ -8,7 +8,8 @@ import { OfflineBanner, cx } from './ui';
 
 const TABS = [
   { to: '/',              label: 'Home',    icon: Home,          end: true },
-  { to: '/work',          label: 'My work', icon: ClipboardList, end: false },
+  { to: '/work',          label: 'Work',    icon: ClipboardList, end: false },
+  { to: '/leave',         label: 'Leave',   icon: CalendarDays,  end: false },
   { to: '/expenses',      label: 'Expenses',icon: Receipt,       end: false },
   { to: '/notifications', label: 'Alerts',  icon: Bell,          end: false, badge: true },
   { to: '/profile',       label: 'Profile', icon: User,          end: false },

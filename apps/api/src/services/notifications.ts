@@ -6,6 +6,7 @@ export type NotificationType =
   | 'work.returned' | 'work.completed' | 'work.overdue'
   | 'expense.submitted' | 'expense.approved' | 'expense.rejected'
   | 'expense.returned' | 'expense.paid' | 'expense.awaiting_approval'
+  | 'leave.applied' | 'leave.approved' | 'leave.rejected'
   | 'announcement';
 
 export interface NotifyInput {
@@ -13,7 +14,7 @@ export interface NotifyInput {
   type: NotificationType;
   title: string;
   body: string;
-  entityType?: 'work_assignment' | 'expense_claim' | 'project' | null;
+  entityType?: 'work_assignment' | 'expense_claim' | 'project' | 'leave_request' | null;
   entityId?: string | null;
   severity?: 'info' | 'success' | 'warning' | 'critical';
 }

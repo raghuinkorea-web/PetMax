@@ -9,6 +9,7 @@ import { WorkDetailScreen } from './pages/WorkDetail';
 import { ExpensesScreen } from './pages/Expenses';
 import { AddExpenseScreen } from './pages/AddExpense';
 import { ExpenseDetailScreen } from './pages/ExpenseDetail';
+import { LeaveScreen } from './pages/Leave';
 import { NotificationsScreen } from './pages/Notifications';
 import { ProfileScreen, DevicesScreen } from './pages/Profile';
 
@@ -50,6 +51,7 @@ export function App() {
       <Route element={<Shell />}>
         <Route index element={<HomeScreen />} />
         <Route path="work" element={<WorkScreen />} />
+        <Route path="leave" element={<LeaveScreen />} />
         <Route path="expenses" element={<ExpensesScreen />} />
         <Route path="notifications" element={<NotificationsScreen />} />
         <Route path="profile" element={<ProfileScreen />} />

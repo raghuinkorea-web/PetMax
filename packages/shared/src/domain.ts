@@ -106,6 +106,25 @@ export const EMPLOYEE_STATUS = meta<EmployeeStatus>([
   { value: 'suspended', label: 'Suspended', tone: 'danger',  description: 'Access blocked by an administrator' },
 ]);
 
+// ---------------------------------------------------------------------
+// Leave
+// ---------------------------------------------------------------------
+export type LeaveStatus = 'pending' | 'approved' | 'rejected' | 'cancelled';
+
+export const LEAVE_STATUS = meta<LeaveStatus>([
+  { value: 'pending',   label: 'Pending',   tone: 'warning', description: 'Applied for; awaiting a manager decision' },
+  { value: 'approved',  label: 'Approved',  tone: 'success', description: 'Entitled absence; the employee is On Leave on these dates' },
+  { value: 'rejected',  label: 'Rejected',  tone: 'danger',  description: 'Declined with a recorded reason' },
+  { value: 'cancelled', label: 'Cancelled', tone: 'neutral', description: 'Withdrawn by the employee before a decision' },
+]);
+
+export const LEAVE_TRANSITIONS: Record<LeaveStatus, LeaveStatus[]> = {
+  pending:   ['approved', 'rejected', 'cancelled'],
+  approved:  [],
+  rejected:  [],
+  cancelled: [],
+};
+
 export type TimeVerification = 'unverified' | 'verified' | 'rejected';
 export const TIME_VERIFICATION = meta<TimeVerification>([
   { value: 'unverified', label: 'Recorded',  tone: 'info',    description: 'Logged by the employee, not yet verified' },
@@ -137,4 +156,7 @@ export const METRIC_DEFINITIONS: Record<string, string> = {
     'Sum of claims in Submitted or Under review status. Each claim is counted once.',
   budget_utilisation:
     'Approved project expense divided by the configured project budget. Shown only when a budget is set.',
+  leave_days:
+    'Calendar days covered by an approved leave request, counting both the first and last day. '
+    + 'An approved leave day is an entitled absence: it is not on-duty time and is never counted as an absence.',
 };
