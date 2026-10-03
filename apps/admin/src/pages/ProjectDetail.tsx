@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from 'recharts';
-import { ArrowLeft, Clock, Download, UserCheck, UserMinus, UserPlus } from 'lucide-react';
+import { ArrowLeft, Clock, Download, PlayCircle, UserCheck, UserMinus, UserPlus } from 'lucide-react';
 import {
   METRIC_DEFINITIONS, PRIORITY, PROJECT_STATUS, ROLE_LABELS, WORK_STATUS,
   dateLabel, hours, money, percent,
@@ -106,11 +106,17 @@ export function ProjectDetailPage() {
             {/* --- Always-visible header stats --------------------- */}
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
               <Stat label="Status" custom={statusMeta && (
-                <div className="mt-2 flex flex-wrap gap-1.5">
-                  <StatusBadge tone={statusMeta.tone}>{statusMeta.label}</StatusBadge>
-                  <StatusBadge tone={PRIORITY.byValue[p.priority as 'medium'].tone} dot={false}>
-                    {PRIORITY.byValue[p.priority as 'medium'].label}
-                  </StatusBadge>
+                <div className="mt-2 space-y-2">
+                  <div className="flex flex-wrap gap-1.5">
+                    <StatusBadge tone={statusMeta.tone}>{statusMeta.label}</StatusBadge>
+                    <StatusBadge tone={PRIORITY.byValue[p.priority as 'medium'].tone} dot={false}>
+                      {PRIORITY.byValue[p.priority as 'medium'].label}
+                    </StatusBadge>
+                  </div>
+                  {can('project.update') && (
+                    <StatusControl projectId={id} status={p.status}
+                      onChanged={() => void qc.invalidateQueries({ queryKey: ['project', id] })} />
+                  )}
                 </div>
               )} />
               <Stat label="Completion" value={percent(p.completionPct)}
@@ -453,6 +459,55 @@ function Stat({ label, value, sub, custom, tone, definition }: {
         </>
       )}
     </div>
+  );
+}
+
+/**
+ * Moves a project between statuses.
+ *
+ * A project is created as a draft, and until now nothing in the portal
+ * could change that — the API accepted the edit, but no screen ever sent
+ * one. A draft takes no work assignments and is invisible to field staff,
+ * so a project could be fully set up and still be unusable with no way
+ * to say why.
+ */
+function StatusControl({ projectId, status, onChanged }: {
+  projectId: string; status: string; onChanged: () => void;
+}) {
+  const toast = useToast();
+
+  const move = useMutation({
+    mutationFn: (next: string) => api.patch(`/projects/${projectId}`, { status: next }),
+    onSuccess: (_d, next) => {
+      const meta = PROJECT_STATUS.byValue[next as ProjectStatus];
+      toast.success(`Project is now ${meta.label.toLowerCase()}`,
+        next === 'active' ? 'Work can be assigned, and field staff can see it.' : meta.description);
+      onChanged();
+    },
+    onError: (e) => toast.error('Could not change the status', (e as Error).message),
+  });
+
+  // The one-tap path out of the state that actually blocks work.
+  if (status === 'draft') {
+    return (
+      <div className="flex flex-wrap items-center gap-2">
+        <Button size="sm" variant="primary" icon={<PlayCircle className="h-3.5 w-3.5" />}
+                loading={move.isPending} onClick={() => move.mutate('active')}>
+          Activate
+        </Button>
+        <span className="text-xs text-ink-500">No work can be assigned while it is a draft.</span>
+      </div>
+    );
+  }
+
+  return (
+    <Select value={status} aria-label="Project status" className="h-8 text-sm"
+            disabled={move.isPending}
+            onChange={(e) => move.mutate(e.target.value)}>
+      {PROJECT_STATUS.list.map((s) => (
+        <option key={s.value} value={s.value}>{s.label}</option>
+      ))}
+    </Select>
   );
 }
 
