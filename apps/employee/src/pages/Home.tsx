@@ -10,6 +10,7 @@ import {
 } from '@adisys/shared';
 import { api } from '../lib/api';
 import { useAuth } from '../lib/auth';
+import { currentPosition } from '../lib/geo';
 import { Avatar } from '../components/Avatar';
 import { Screen, ScreenHeader } from '../components/Shell';
 import {
@@ -372,21 +373,3 @@ const greeting = () => {
   return h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening';
 };
 
-/** Best-effort GPS fix; never blocks the action if it fails or is denied. */
-async function currentPosition(): Promise<{ latitude: number; longitude: number; accuracyM: number } | null> {
-  if (!('geolocation' in navigator)) return null;
-  return new Promise((resolve) => {
-    const timeout = setTimeout(() => resolve(null), 6000);
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        clearTimeout(timeout);
-        resolve({
-          latitude: Number(pos.coords.latitude.toFixed(6)),
-          longitude: Number(pos.coords.longitude.toFixed(6)),
-          accuracyM: Math.round(pos.coords.accuracy),
-        });
-      },
-      () => { clearTimeout(timeout); resolve(null); },
-      { enableHighAccuracy: true, timeout: 5000, maximumAge: 30_000 });
-  });
-}

@@ -8,6 +8,8 @@ import {
   PRIORITY, WORK_STATUS, dateLabel, dateTimeLabel, hours, relativeDays, type WorkStatus,
 } from '@adisys/shared';
 import { api } from '../lib/api';
+import { currentPosition } from '../lib/geo';
+import { useAuth } from '../lib/auth';
 import { deviceLabel } from '../lib/auth';
 import {
   Button, Card, ErrorState, Field, SectionTitle, Sheet, Skeleton, StatusBadge, Textarea, cx, useToast,
@@ -18,6 +20,7 @@ export function WorkDetailScreen() {
   const navigate = useNavigate();
   const toast = useToast();
   const qc = useQueryClient();
+  const { user } = useAuth();
   const [sheet, setSheet] = useState<'clarify' | 'submit' | 'progress' | null>(null);
 
   const query = useQuery({ queryKey: ['assignment', id], queryFn: () => api.get(`/assignments/${id}`) });
@@ -45,7 +48,12 @@ export function WorkDetailScreen() {
   });
 
   const startTimer = useMutation({
-    mutationFn: () => api.post('/time/timer/start', { assignmentId: id }),
+    mutationFn: async () => {
+      // Geotags the "Start work" event. A null fix is expected on a weak
+      // signal and must not stop the timer, so the coords are simply omitted.
+      const coords = user?.locationConsentAt ? await currentPosition() : null;
+      return api.post('/time/timer/start', { assignmentId: id, ...(coords ?? {}) });
+    },
     onSuccess: () => { toast.success('Timer started', 'Recording time against this assignment.'); invalidate(); },
     onError: (err) => toast.error('Could not start the timer', (err as Error).message),
   });
@@ -239,6 +247,9 @@ export function WorkDetailScreen() {
             </p>
           </Card>
         )}
+
+        {/* --- Where this job was started and finished ---------- */}
+        <LocationLog events={query.data?.events ?? []} />
       </div>
 
       {/* --- Action bar ------------------------------------- */}
@@ -283,6 +294,66 @@ export function WorkDetailScreen() {
 }
 
 /* =================================================================== */
+/**
+ * The positions recorded against this job, shown to the employee who did it.
+ *
+ * Field staff should be able to see exactly what was stored about where they
+ * were — a consent that cannot be inspected is not a meaningful one — so this
+ * card is rendered from the same data the manager sees, including the events
+ * where no fix could be obtained.
+ */
+function LocationLog({ events }: { events: any[] }) {
+  const geotagged = events.filter(
+    (e) => e.toStatus === 'in_progress' || e.toStatus === 'submitted');
+  if (geotagged.length === 0) return null;
+
+  return (
+    <Card>
+      <SectionTitle>Where you started and finished</SectionTitle>
+      <ul className="space-y-2">
+        {geotagged.map((e: any) => {
+          const has = e.latitude != null && e.longitude != null;
+          const lat = has ? Number(e.latitude).toFixed(6) : null;
+          const lng = has ? Number(e.longitude).toFixed(6) : null;
+          return (
+            <li key={e.id} className="border-b border-line pb-2 last:border-0 last:pb-0">
+              <p className="text-sm text-ink-800">
+                {e.toStatus === 'in_progress' ? 'Started work' : 'Marked done'}
+              </p>
+              <p className="text-[12px] text-ink-500">{dateTimeLabel(e.createdAt)}</p>
+              {has ? (
+                <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[12px] text-ink-500">
+                  <span className="flex items-center gap-1">
+                    <MapPin className="h-3 w-3 text-ink-400" aria-hidden />
+                    <span className="tabular">{lat}, {lng}</span>
+                  </span>
+                  {e.accuracyM != null && <span className="text-ink-400">±{Math.round(Number(e.accuracyM))} m</span>}
+                  <a className="text-brand underline underline-offset-2"
+                     href={`https://www.google.com/maps/search/?api=1&query=${lat},${lng}`}
+                     target="_blank" rel="noopener noreferrer">
+                    View on map
+                  </a>
+                </p>
+              ) : (
+                <p className="mt-0.5 flex items-center gap-1 text-[12px] text-ink-400">
+                  <MapPin className="h-3 w-3" aria-hidden />
+                  {e.locationConsented === false
+                    ? 'Location not shared'
+                    : 'No GPS fix at the time'}
+                </p>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+      <p className="mt-3 border-t border-line pt-2.5 text-[12px] leading-relaxed text-ink-500">
+        Your location is recorded only when you start a job and when you mark it
+        done. You can withdraw consent at any time from your profile.
+      </p>
+    </Card>
+  );
+}
+
 function Fact({ icon, term, value, tone, span }: {
   icon?: React.ReactNode; term: string; value: string; tone?: 'danger'; span?: boolean;
 }) {
@@ -330,9 +401,13 @@ function ClarifySheet({ id, onClose, onDone }: { id: string; onClose: () => void
 
 function SubmitSheet({ id, onClose, onDone }: { id: string; onClose: () => void; onDone: () => void }) {
   const toast = useToast();
+  const { user } = useAuth();
   const [note, setNote] = useState('');
   const submit = useMutation({
-    mutationFn: () => api.post(`/assignments/${id}/status`, { status: 'submitted', note }),
+    mutationFn: async () => {
+      const coords = user?.locationConsentAt ? await currentPosition() : null;
+      return api.post(`/assignments/${id}/status`, { status: 'submitted', note, ...(coords ?? {}) });
+    },
     onSuccess: () => {
       toast.success('Submitted for review',
         'Your manager will accept it or come back with questions.');

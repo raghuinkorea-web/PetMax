@@ -516,6 +516,7 @@ function AssignmentDrawer({ id, onClose }: { id: string; onClose: () => void }) 
                     {e.actorName && <span className="text-ink-500"> by {e.actorName}</span>}
                   </p>
                   {e.note && <p className="mt-0.5 text-xs text-ink-500">{e.note}</p>}
+                  <EventLocation event={e} />
                   <p className="text-[12px] text-ink-400">{new Date(e.createdAt).toLocaleString('en-IN')}</p>
                 </li>
               ))}
@@ -524,6 +525,64 @@ function AssignmentDrawer({ id, onClose }: { id: string; onClose: () => void }) 
         </div>
       )}
     </Modal>
+  );
+}
+
+/**
+ * Where the employee was when they started or finished the job.
+ *
+ * Three states, deliberately distinguished: a position, "no fix" (consent was
+ * given but the device could not produce one — common in basements and steel
+ * structures), and nothing at all for events that are not geotagged or for
+ * viewers the location policy does not admit. Accuracy is always shown beside
+ * the coordinates, because a 2km reading is a cell-tower estimate rather than
+ * a GPS fix and should not be read as proof of presence.
+ */
+function EventLocation({ event }: { event: any }) {
+  const geotagged = event.toStatus === 'in_progress' || event.toStatus === 'submitted';
+  if (!geotagged) return null;
+
+  // The API withholds coordinates from viewers outside location_policy, but
+  // still reports whether the event carried one.
+  if (event.latitude == null || event.longitude == null) {
+    if (!event.locationRecorded) {
+      return (
+        <p className="mt-0.5 flex items-center gap-1 text-xs text-ink-400">
+          <MapPin className="h-3 w-3" aria-hidden />
+          {event.locationConsented === false
+            ? 'Location not shared — employee has not consented'
+            : 'Location not recorded — no GPS fix at the time'}
+        </p>
+      );
+    }
+    return (
+      <p className="mt-0.5 flex items-center gap-1 text-xs text-ink-400">
+        <MapPin className="h-3 w-3" aria-hidden /> Location recorded
+      </p>
+    );
+  }
+
+  const lat = Number(event.latitude).toFixed(6);
+  const lng = Number(event.longitude).toFixed(6);
+  const accuracy = event.accuracyM == null ? null : Math.round(Number(event.accuracyM));
+
+  return (
+    <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-ink-500">
+      <span className="flex items-center gap-1">
+        <MapPin className="h-3 w-3 text-ink-400" aria-hidden />
+        <span className="font-mono">{lat}, {lng}</span>
+      </span>
+      {accuracy !== null && <span className="text-ink-400">±{accuracy} m</span>}
+      <a
+        className="text-brand-600 underline underline-offset-2 hover:text-brand-700"
+        href={`https://www.google.com/maps/search/?api=1&query=${lat},${lng}`}
+        target="_blank"
+        // noreferrer keeps the employee's position out of Google's referrer header.
+        rel="noopener noreferrer"
+      >
+        View on map
+      </a>
+    </p>
   );
 }
 
