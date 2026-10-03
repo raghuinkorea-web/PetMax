@@ -59,10 +59,11 @@ try {
   log(`    ${permissionCatalogue.length} permissions`);
 
   const roleDefs = [
-    ['super_admin',     'Super Admin',                  'Unrestricted access to every module and setting.'],
-    ['ops_manager',     'Operations / Project Manager', 'Runs projects, assigns work, reviews completion and approves expenses at the manager stage.'],
-    ['finance_manager', 'Finance / Accounts Manager',   'Reviews and settles expense claims; organisation-wide financial reporting.'],
-    ['employee',        'Employee / Field Staff',       'Receives and acknowledges work, records time, submits expense claims.'],
+    ['super_admin',     'Super Admin',               'Unrestricted access to every module and setting. Creates projects.'],
+    ['sales_manager',   'Sales Manager',             'Takes a newly created project and hands it to a Project Manager.'],
+    ['ops_manager',     'Project Manager',           'Runs the projects handed to them: adds technicians, assigns activities, reviews completion and approves expenses at the manager stage.'],
+    ['finance_manager', 'Finance / Accounts Manager', 'Reviews and settles expense claims; organisation-wide financial reporting.'],
+    ['employee',        'Technician / Field Staff',  'Receives and acknowledges activities, records time, submits expense claims.'],
   ];
   const roleIds = {};
   for (const [key, name, description] of roleDefs) {
@@ -78,6 +79,7 @@ try {
   };
   const matrix = {
     super_admin: permissionCatalogue.map((p) => p.key),
+    sales_manager: listFor('SALES_MANAGER'),
     ops_manager: listFor('OPS_MANAGER'),
     finance_manager: listFor('FINANCE_MANAGER'),
     employee: listFor('EMPLOYEE'),
@@ -338,7 +340,7 @@ try {
     ['organization', 'business_hours', {
       workWeek: ['mon', 'tue', 'wed', 'thu', 'fri', 'sat'],
       standardStart: '09:00', standardEnd: '18:00', standardDailyHours: 8,
-      halfDays: ['sat'], holidayCalendar: 'IN-TS',
+      halfDays: ['sat'], holidayCalendar: 'IN-KA',
     }],
     ['productivity', 'rules', {
       timeTrackingMethods: { timer: true, manualEntry: true, attendanceCheckIn: true },

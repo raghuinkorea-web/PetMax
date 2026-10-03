@@ -15,6 +15,7 @@ const SELECT_PROJECT = `
          s.client_name AS "clientName", p.client_location AS "clientLocation",
          p.project_type_id AS "projectTypeId", pt.name AS "projectTypeName",
          s.manager_id AS "managerId", s.manager_name AS "managerName",
+         s.sales_manager_id AS "salesManagerId", s.sales_manager_name AS "salesManagerName",
          s.start_date AS "startDate", s.expected_end_date AS "expectedEndDate",
          s.actual_end_date AS "actualEndDate", s.status, s.priority,
          s.budget_enabled AS "budgetEnabled", s.budget_amount AS "budgetAmount", s.currency,
@@ -131,6 +132,70 @@ projectRouter.get('/:id/activity', asyncHandler(async (req, res) => {
   res.json({ data: rows, page: pageMeta(f.page, f.size, rows.length) });
 }));
 
+/**
+ * Checks that a nominee actually holds the role the seat requires, and
+ * reports it against the right form field so the client can mark the
+ * picker rather than showing a bare banner.
+ */
+async function assertHoldsRole(
+  userId: string, seat: 'manager' | 'salesManager',
+) {
+  const spec = {
+    manager: {
+      field: 'managerId', label: 'Project Manager',
+      // Sales Managers may run a project too, and hold the permissions to
+      // do it. The two seats still have to be two different people, which
+      // assertDistinctSeats enforces.
+      allowed: ['ops_manager', 'sales_manager', 'super_admin'],
+      why: 'Only a Project Manager or a Sales Manager can run a project',
+    },
+    salesManager: {
+      field: 'salesManagerId', label: 'Sales Manager',
+      allowed: ['sales_manager', 'super_admin'],
+      why: 'Only a Sales Manager can own the hand-over',
+    },
+  }[seat];
+
+  const u = await one<{ role_key: string; full_name: string }>(
+    `SELECT r.key AS role_key, u.full_name FROM users u JOIN roles r ON r.id = u.role_id
+      WHERE u.id = $1 AND u.deleted_at IS NULL AND u.status = 'active'`, [userId]);
+  if (!u) {
+    throw badRequest(`Choose an active ${spec.label}.`, { [spec.field]: ['Unknown or inactive user'] });
+  }
+  if (!spec.allowed.includes(u.role_key)) {
+    throw badRequest(`${u.full_name} does not hold the ${spec.label} role.`,
+      { [spec.field]: [spec.why] });
+  }
+  return u;
+}
+
+const assertCanManageProjects = (userId: string) => assertHoldsRole(userId, 'manager');
+
+/**
+ * May this caller act on a project they do not run?
+ *
+ * This used to ask `project.view.all`, which is wrong: a Sales Manager
+ * holds it so they can FIND the projects waiting for a manager, and that
+ * silently let them staff projects run by somebody else. Being able to
+ * see every project is not the same as being able to administer every
+ * project. `project.assign_sales_manager` is Admin-only and means exactly
+ * the latter — deciding who is in charge of what.
+ */
+const mayAdministerAnyProject = (req: Parameters<typeof can>[0]) =>
+  can(req, 'project.assign_sales_manager');
+
+/**
+ * The two seats must be filled by two different people — a hand-over from
+ * someone to themselves is not a hand-over. The database enforces this
+ * too; this produces a readable message instead of a constraint error.
+ */
+function assertDistinctSeats(managerId: string | null, salesManagerId: string | null, field: string) {
+  if (managerId && salesManagerId && managerId === salesManagerId) {
+    throw badRequest('The Sales Manager and the Project Manager must be two different people.',
+      { [field]: ['Already holds the other role on this project'] });
+  }
+}
+
 // ---------------------------------------------------------------------
 const projectBase = z.object({
   name: z.string().trim().min(3, 'Give the project a name').max(180),
@@ -138,7 +203,14 @@ const projectBase = z.object({
   clientName: z.string().trim().min(2, 'Enter the client name').max(180),
   clientLocation: z.string().trim().max(200).optional(),
   projectTypeId: uuid.optional(),
-  managerId: uuid,
+  // Optional: an Admin opens a project, and a Sales Manager attaches the
+  // Project Manager afterwards. Passing one here is still allowed for
+  // anyone who may do both steps, so a single operator is not forced
+  // through two screens.
+  managerId: uuid.nullish(),
+  // The Sales Manager who owns this project's hand-over. Set by the Admin
+  // when the project is opened, or later.
+  salesManagerId: uuid.nullish(),
   startDate: dateString,
   expectedEndDate: dateString.optional(),
   status: z.enum(['draft', 'active', 'on_hold', 'completed', 'cancelled']).default('draft'),
@@ -165,24 +237,40 @@ projectRouter.post('/', requirePermission('project.create'), asyncHandler(async 
   const p = principalOf(req);
   const body = parse(projectSchema, req.body);
 
-  const manager = await one<{ id: string; role_key: string }>(
-    `SELECT u.id, r.key AS role_key FROM users u JOIN roles r ON r.id = u.role_id
-      WHERE u.id = $1 AND u.deleted_at IS NULL AND u.status = 'active'`, [body.managerId]);
-  if (!manager) throw badRequest('Choose an active project manager.', { managerId: ['Unknown or inactive user'] });
-  if (!['ops_manager', 'super_admin'].includes(manager.role_key)) {
-    throw badRequest('The project manager must hold an Operations Manager or Super Admin role.',
-      { managerId: ['This employee cannot manage projects'] });
+  // A manager is optional at creation, but naming one is itself the
+  // hand-over, so it takes the permission that governs the hand-over.
+  if (body.managerId) {
+    if (!can(req, 'project.assign_manager')) {
+      throw forbidden('A Sales Manager assigns the Project Manager. Create the project and they will pick it up.');
+    }
+    await assertCanManageProjects(body.managerId);
+  }
+
+  if (body.salesManagerId) {
+    if (!can(req, 'project.assign_sales_manager')) {
+      throw forbidden('Only an Admin can put a Sales Manager in charge of a project.');
+    }
+    await assertHoldsRole(body.salesManagerId, 'salesManager');
+  }
+  assertDistinctSeats(body.managerId ?? null, body.salesManagerId ?? null, 'salesManagerId');
+
+  // Same invariant the members endpoint enforces: nobody is staffed onto a
+  // project that has no one responsible for it.
+  if (body.memberIds.length && !body.managerId) {
+    throw badRequest('Add the team once a Project Manager has been assigned — they decide who works on it.',
+      { memberIds: ['No Project Manager yet'] });
   }
 
   const created = await tx(async (client) => {
     const code = (await one<{ c: string }>(`SELECT next_code('project','PRJ') AS c`, [], client))!.c;
     const row = await one<{ id: string }>(
       `INSERT INTO projects (project_code, name, description, client_name, client_location, project_type_id,
-                             manager_id, start_date, expected_end_date, status, priority,
+                             manager_id, sales_manager_id, start_date, expected_end_date, status, priority,
                              budget_amount, budget_enabled, requires_project_on_expense, notes, created_by)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16) RETURNING id`,
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17) RETURNING id`,
       [code, body.name, body.description ?? null, body.clientName, body.clientLocation ?? null,
-       body.projectTypeId ?? null, body.managerId, body.startDate, body.expectedEndDate ?? null,
+       body.projectTypeId ?? null, body.managerId ?? null, body.salesManagerId ?? null,
+       body.startDate, body.expectedEndDate ?? null,
        body.status, body.priority, body.budgetEnabled ? body.budgetAmount : null,
        body.budgetEnabled, body.requiresProjectOnExpense, body.notes ?? null, p.id], client);
 
@@ -192,6 +280,16 @@ projectRouter.post('/', requirePermission('project.create'), asyncHandler(async 
     }
     return { id: row!.id, projectCode: code };
   });
+
+  // Whoever was handed a seat at creation is told about it, exactly as they
+  // would be if the seat were filled later from the project page.
+  if (body.salesManagerId) {
+    await notify({
+      userId: body.salesManagerId, type: 'announcement', title: 'You have been given a project',
+      body: `${created.projectCode} — ${body.name} is yours. Hand it to a Project Manager when you are ready.`,
+      entityType: 'project', entityId: created.id, severity: 'info',
+    });
+  }
 
   await recordAudit(req, { action: 'project.created', entityType: 'project', entityId: created.id, after: body });
   res.status(201).json(created);
@@ -203,16 +301,41 @@ projectRouter.patch('/:id', requirePermission('project.update'), asyncHandler(as
 
   const before = await one<any>(`SELECT * FROM projects WHERE id = $1 AND deleted_at IS NULL`, [req.params.id]);
   if (!before) throw notFound('Project');
-  if (before.manager_id !== p.id && !can(req, 'project.view.all')) {
+
+  // Changing who runs a project is the hand-over, not an edit. Routing it
+  // through here would let anyone holding project.update — every Project
+  // Manager — quietly reassign a project to themselves or away from
+  // themselves, bypassing project.assign_manager entirely.
+  if (body.managerId !== undefined && body.managerId !== before.manager_id) {
+    if (!can(req, 'project.assign_manager')) {
+      throw forbidden('Only a Sales Manager or an Admin can change a project\'s Project Manager.');
+    }
+    if (body.managerId === null) throw badRequest('A project cannot be left without a Project Manager once it has one.');
+    await assertCanManageProjects(body.managerId);
+    assertDistinctSeats(body.managerId, before.sales_manager_id, 'managerId');
+  }
+  // The Sales Manager seat is guarded the same way, and for the same
+  // reason: it decides who is allowed to perform the hand-over.
+  if (body.salesManagerId !== undefined && body.salesManagerId !== before.sales_manager_id) {
+    if (!can(req, 'project.assign_sales_manager')) {
+      throw forbidden('Only an Admin can change a project\'s Sales Manager.');
+    }
+    if (body.salesManagerId !== null) {
+      await assertHoldsRole(body.salesManagerId, 'salesManager');
+      assertDistinctSeats(body.managerId ?? before.manager_id, body.salesManagerId, 'salesManagerId');
+    }
+  }
+  if (before.manager_id !== p.id && !mayAdministerAnyProject(req)) {
     throw forbidden('You can only edit projects you manage.');
   }
-  if (before.status === 'completed' && body.status && body.status !== 'completed' && !can(req, 'project.view.all')) {
+  if (before.status === 'completed' && body.status && body.status !== 'completed' && !mayAdministerAnyProject(req)) {
     throw forbidden('Only a Super Admin can reopen a completed project.');
   }
 
   const columns: Record<string, string> = {
     name: 'name', description: 'description', clientName: 'client_name', clientLocation: 'client_location',
-    projectTypeId: 'project_type_id', managerId: 'manager_id', startDate: 'start_date',
+    projectTypeId: 'project_type_id', managerId: 'manager_id',
+    salesManagerId: 'sales_manager_id', startDate: 'start_date',
     expectedEndDate: 'expected_end_date', status: 'status', priority: 'priority',
     budgetAmount: 'budget_amount', budgetEnabled: 'budget_enabled',
     requiresProjectOnExpense: 'requires_project_on_expense', notes: 'notes',
@@ -238,6 +361,111 @@ projectRouter.patch('/:id', requirePermission('project.update'), asyncHandler(as
 }));
 
 // ---------------------------------------------------------------------
+// Step 1b — the Admin puts a Sales Manager in charge of the project
+// ---------------------------------------------------------------------
+projectRouter.post('/:id/sales-manager', requirePermission('project.assign_sales_manager'),
+  asyncHandler(async (req, res) => {
+    const body = parse(z.object({
+      salesManagerId: uuid,
+      note: z.string().trim().max(500).optional(),
+    }), req.body);
+
+    const project = await one<{
+      id: string; name: string; project_code: string;
+      manager_id: string | null; sales_manager_id: string | null;
+    }>(
+      `SELECT id, name, project_code, manager_id, sales_manager_id FROM projects
+        WHERE id = $1 AND deleted_at IS NULL`, [req.params.id]);
+    if (!project) throw notFound('Project');
+
+    const sm = await assertHoldsRole(body.salesManagerId, 'salesManager');
+    if (project.sales_manager_id === body.salesManagerId) {
+      throw conflict(`${sm.full_name} already owns this project.`, 'ALREADY_SALES_MANAGER');
+    }
+    assertDistinctSeats(project.manager_id, body.salesManagerId, 'salesManagerId');
+
+    await query(`UPDATE projects SET sales_manager_id = $2 WHERE id = $1`,
+      [project.id, body.salesManagerId]);
+
+    await notify({
+      userId: body.salesManagerId, type: 'announcement',
+      title: project.sales_manager_id ? 'A project was transferred to you' : 'You have been given a project',
+      body: `${project.project_code} — ${project.name} is yours. `
+          + (project.manager_id
+              ? 'It already has a Project Manager.'
+              : 'Hand it to a Project Manager when you are ready.')
+          + (body.note ? ` Note: ${body.note}` : ''),
+      entityType: 'project', entityId: project.id, severity: 'info',
+    });
+
+    await recordAudit(req, {
+      action: project.sales_manager_id ? 'project.sales_manager_transferred' : 'project.sales_manager_assigned',
+      entityType: 'project', entityId: project.id,
+      before: { salesManagerId: project.sales_manager_id }, after: { salesManagerId: body.salesManagerId },
+    });
+    res.json({ ok: true, salesManagerId: body.salesManagerId, salesManagerName: sm.full_name });
+  }));
+
+// ---------------------------------------------------------------------
+// Step 2 — the Sales Manager hands the project to a Project Manager
+// ---------------------------------------------------------------------
+projectRouter.post('/:id/manager', requirePermission('project.assign_manager'),
+  asyncHandler(async (req, res) => {
+    const p = principalOf(req);
+    const body = parse(z.object({
+      managerId: uuid,
+      note: z.string().trim().max(500).optional(),
+    }), req.body);
+
+    const project = await one<{
+      id: string; name: string; project_code: string;
+      manager_id: string | null; sales_manager_id: string | null;
+    }>(
+      `SELECT id, name, project_code, manager_id, sales_manager_id FROM projects
+        WHERE id = $1 AND deleted_at IS NULL`, [req.params.id]);
+    if (!project) throw notFound('Project');
+
+    /*
+     * Once a project names its Sales Manager, the hand-over is theirs to
+     * make — not any Sales Manager's. An Admin can always step in, so an
+     * absence never strands a project. Where no Sales Manager has been
+     * named yet, any of them may act, so nothing is blocked either.
+     */
+    if (project.sales_manager_id
+        && project.sales_manager_id !== p.id
+        && !can(req, 'project.assign_sales_manager')) {
+      throw forbidden('This project belongs to a different Sales Manager. '
+        + 'Ask them to hand it over, or an Admin to reassign it.');
+    }
+
+    const manager = await assertCanManageProjects(body.managerId);
+    assertDistinctSeats(body.managerId, project.sales_manager_id, 'managerId');
+    if (project.manager_id === body.managerId) {
+      throw conflict(`${manager.full_name} already runs this project.`, 'ALREADY_MANAGER');
+    }
+
+    // Handing over does not silently strip the outgoing manager of their
+    // project membership: they may still be doing work on it.
+    await query(`UPDATE projects SET manager_id = $2 WHERE id = $1`, [project.id, body.managerId]);
+
+    await notify({
+      userId: body.managerId, type: 'announcement',
+      title: project.manager_id ? 'A project was transferred to you' : 'You have been made Project Manager',
+      body: `${project.project_code} — ${project.name} is now yours to run. `
+          + `Add the technicians you need and assign their activities.`
+          + (body.note ? ` Note: ${body.note}` : ''),
+      entityType: 'project', entityId: project.id, severity: 'info',
+    });
+
+    await recordAudit(req, {
+      action: project.manager_id ? 'project.manager_transferred' : 'project.manager_assigned',
+      entityType: 'project', entityId: project.id,
+      before: { managerId: project.manager_id }, after: { managerId: body.managerId },
+    });
+    res.json({ ok: true, managerId: body.managerId, managerName: manager.full_name });
+  }));
+
+// ---------------------------------------------------------------------
 // Membership
 // ---------------------------------------------------------------------
 projectRouter.post('/:id/members', requirePermission('project.assign_members'), asyncHandler(async (req, res) => {
@@ -248,10 +476,16 @@ projectRouter.post('/:id/members', requirePermission('project.assign_members'), 
     allocationPct: z.coerce.number().int().min(0).max(100).optional(),
   }), req.body);
 
-  const project = await one<{ manager_id: string; name: string; status: string }>(
+  const project = await one<{ manager_id: string | null; name: string; status: string }>(
     `SELECT manager_id, name, status FROM projects WHERE id = $1 AND deleted_at IS NULL`, [req.params.id]);
   if (!project) throw notFound('Project');
-  if (project.manager_id !== p.id && !can(req, 'project.view.all')) {
+  // Step 3 cannot run before step 2. Without this an Admin could staff a
+  // project that nobody has been made responsible for.
+  if (!project.manager_id) {
+    throw conflict('This project has no Project Manager yet. A Sales Manager assigns one first, '
+      + 'and the Project Manager then adds the technicians.', 'NO_PROJECT_MANAGER');
+  }
+  if (project.manager_id !== p.id && !mayAdministerAnyProject(req)) {
     throw forbidden('You can only assign members to projects you manage.');
   }
 
@@ -287,7 +521,7 @@ projectRouter.delete('/:id/members/:userId', requirePermission('project.assign_m
     const project = await one<{ manager_id: string }>(
       `SELECT manager_id FROM projects WHERE id = $1 AND deleted_at IS NULL`, [req.params.id]);
     if (!project) throw notFound('Project');
-    if (project.manager_id !== p.id && !can(req, 'project.view.all')) {
+    if (project.manager_id !== p.id && !mayAdministerAnyProject(req)) {
       throw forbidden('You can only change membership on projects you manage.');
     }
 

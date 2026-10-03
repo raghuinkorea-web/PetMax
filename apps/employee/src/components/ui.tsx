@@ -287,22 +287,45 @@ export function useToast() {
 }
 
 /* =================================================================== */
-export function SegmentedControl<T extends string>({ options, value, onChange }: {
-  options: Array<{ value: T; label: string; count?: number }>; value: T; onChange: (v: T) => void;
+/**
+ * `trailing` renders inside the same wrapping row, so an extra control sits
+ * with the options rather than competing with them for width.
+ *
+ * The row wraps instead of scrolling: a chip clipped at the edge of a scroll
+ * container reads as broken, and on a phone these rarely fit on one line.
+ * Buttons carry aria-pressed rather than role="tab", so a trailing control
+ * that is not a tab can share the container without lying about its role.
+ */
+export function SegmentedControl<T extends string>({ options, value, onChange, trailing }: {
+  options: Array<{ value: T; label: string; count?: number }>;
+  value: T; onChange: (v: T) => void; trailing?: ReactNode;
 }) {
   return (
-    <div className="flex gap-1 overflow-x-auto pb-0.5" role="tablist">
+    // Deliberately compact: six of these plus a trailing control have to sit
+    // on one line inside `max-w-lg`, and at the app's default chip size they
+    // do not. Measured, not guessed.
+    <div className="flex flex-wrap items-center gap-1">
       {options.map((o) => (
-        <button key={o.value} role="tab" aria-selected={value === o.value} onClick={() => onChange(o.value)}
-          className={cx('tap-sm flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors',
-            value === o.value ? 'bg-ink-900 text-white' : 'bg-white text-ink-600 ring-1 ring-line-strong')}>
+        <button key={o.value} type="button" aria-pressed={value === o.value} onClick={() => onChange(o.value)}
+          className={cx('tap-xs flex shrink-0 items-center gap-1 rounded-full px-2 py-1 text-xs shadow-card transition-colors',
+            // Unselected chips carry the same slate surface and hairline as
+            // the cards above them; the selected one lifts to white, the way
+            // the app already marks an interactive surface. No black pill —
+            // it was the only pure-dark element on the screen.
+            // The selected one is marked by a dark outline rather than a dark
+            // fill: white on slate alone is only 1.23:1, which is too little
+            // to carry the meaning on its own.
+            value === o.value
+              ? 'bg-white font-semibold text-ink-900 ring-2 ring-ink-600'
+              : 'bg-card font-medium text-ink-600 ring-1 ring-line')}>
           {o.label}
           {o.count !== undefined && o.count > 0 && (
-            <span className={cx('tabular rounded-full px-1.5 text-[12px] font-semibold',
-              value === o.value ? 'bg-white/20' : 'bg-ink-100')}>{o.count}</span>
+            <span className={cx('tabular rounded-full px-1 text-[11px] font-semibold text-ink-900',
+              value === o.value ? 'bg-ink-100' : 'bg-sunken')}>{o.count}</span>
           )}
         </button>
       ))}
+      {trailing}
     </div>
   );
 }

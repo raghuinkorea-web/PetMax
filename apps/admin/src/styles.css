@@ -159,14 +159,26 @@ body {
 }
 :where(input, select, textarea):focus-visible { outline: none; }
 
+/* The thumb is inset by a transparent border rather than one painted in the
+   page colour. Painting it meant the thumb carried a cornflower ring
+   wherever it sat on something that was not the page — inside a card, a
+   modal, a dropdown — which read as a stray blue icon rather than as a
+   scrollbar. A transparent border clipped to the padding box gives the same
+   breathing room against any background. */
 ::-webkit-scrollbar { width: 10px; height: 10px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb {
   background: var(--color-line-strong);
   border-radius: 6px;
-  border: 2px solid var(--color-surface);
+  border: 2px solid transparent;
+  background-clip: padding-box;
 }
-::-webkit-scrollbar-thumb:hover { background: var(--color-ink-400); }
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-ink-400);
+  background-clip: padding-box;
+}
+/* Firefox has no ::-webkit pseudo-elements and was showing its own default. */
+* { scrollbar-color: var(--color-line-strong) transparent; scrollbar-width: thin; }
 
 @keyframes adisys-fade-up { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
 @keyframes adisys-shimmer { 0% { background-position: -400px 0; } 100% { background-position: 400px 0; } }

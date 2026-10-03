@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { one, query, tx } from '../lib/db.js';
 import { asyncHandler, offsetOf, pageMeta, paginationSchema, parse, uuid } from '../lib/http.js';
-import { badRequest, notFound } from '../lib/errors.js';
+import { badRequest, conflict, notFound } from '../lib/errors.js';
 import { principalOf, requirePermission } from '../middleware/auth.js';
 import { recordAudit } from '../services/audit.js';
 import { ROLE_PERMISSIONS, PERMISSIONS } from '@adisys/shared';
@@ -100,13 +100,90 @@ settingsRouter.get('/', requirePermission('settings.view'), asyncHandler(async (
 // ---------------------------------------------------------------------
 // Master data
 // ---------------------------------------------------------------------
-const masterTables: Record<string, { table: string; fields: string[]; label: string }> = {
-  departments:    { table: 'departments',    fields: ['code', 'name'], label: 'Department' },
-  designations:   { table: 'designations',   fields: ['name', 'grade'], label: 'Designation' },
-  'work-locations': { table: 'work_locations', fields: ['code', 'name', 'address_line', 'city', 'state'], label: 'Work location' },
-  'project-types': { table: 'project_types', fields: ['name'], label: 'Project type' },
-  'work-types':   { table: 'work_types',     fields: ['name'], label: 'Work type' },
+/**
+ * `usedBy` lists the foreign keys pointing at each table. A row that is
+ * referenced cannot be deleted — the reference is history (which employee
+ * was in which department, what type of work was done) and deleting it
+ * would either fail on the constraint or, worse, rewrite the past. Those
+ * rows are deactivated instead, which hides them from every picker while
+ * leaving what already happened intact.
+ */
+const masterTables: Record<string, {
+  table: string; fields: string[]; label: string; plural: string;
+  usedBy: Array<{ table: string; column: string; what: string }>;
+}> = {
+  departments: {
+    table: 'departments', fields: ['code', 'name'], label: 'Department', plural: 'Departments',
+    usedBy: [{ table: 'users', column: 'department_id', what: 'employee' },
+             { table: 'expense_policies', column: 'department_id', what: 'approval policy' }],
+  },
+  designations: {
+    table: 'designations', fields: ['name', 'grade'], label: 'Designation', plural: 'Designations',
+    usedBy: [{ table: 'users', column: 'designation_id', what: 'employee' }],
+  },
+  'work-locations': {
+    table: 'work_locations', fields: ['code', 'name', 'address_line', 'city', 'state'],
+    label: 'Work location', plural: 'Work locations',
+    usedBy: [{ table: 'users', column: 'base_location_id', what: 'employee' }],
+  },
+  'project-types': {
+    table: 'project_types', fields: ['name'], label: 'Project type', plural: 'Project types',
+    usedBy: [{ table: 'projects', column: 'project_type_id', what: 'project' }],
+  },
+  'work-types': {
+    table: 'work_types', fields: ['name'], label: 'Work type', plural: 'Work types',
+    usedBy: [{ table: 'work_assignments', column: 'work_type_id', what: 'activity' }],
+  },
 };
+
+/** Every list at once, each row carrying how many things depend on it. */
+settingsRouter.get('/master', requirePermission('settings.view'), asyncHandler(async (_req, res) => {
+  const out: Record<string, unknown> = {};
+  for (const [resource, spec] of Object.entries(masterTables)) {
+    const uses = spec.usedBy
+      .map((u) => `(SELECT count(*) FROM ${u.table} WHERE ${u.column} = t.id)`)
+      .join(' + ');
+    out[resource] = {
+      label: spec.label, plural: spec.plural,
+      fields: spec.fields.map(toCamel),
+      data: await query(
+        `SELECT t.id, ${spec.fields.map((f) => `t.${f} AS "${toCamel(f)}"`).join(', ')},
+                t.active, (${uses})::int AS "usageCount"
+           FROM ${spec.table} t
+          ORDER BY t.active DESC, ${spec.fields[spec.fields.length === 1 ? 0 : 1]}`),
+    };
+  }
+  res.json(out);
+}));
+
+settingsRouter.delete('/master/:resource/:id', requirePermission('settings.manage'),
+  asyncHandler(async (req, res) => {
+    const spec = masterTables[req.params.resource];
+    if (!spec) throw notFound('Resource');
+
+    // Counted per reference so the refusal can say what is actually using it.
+    const blocking: string[] = [];
+    for (const u of spec.usedBy) {
+      const row = await one<{ n: number }>(
+        `SELECT count(*)::int AS n FROM ${u.table} WHERE ${u.column} = $1`, [req.params.id]);
+      const n = row?.n ?? 0;
+      if (n > 0) blocking.push(`${n} ${u.what}${n === 1 ? '' : 's'}`);
+    }
+    if (blocking.length) {
+      throw conflict(
+        `This ${spec.label.toLowerCase()} is still used by ${blocking.join(' and ')}. `
+        + 'Turn it off instead — it will disappear from the dropdowns, and existing records keep their history.',
+        'IN_USE');
+    }
+
+    const row = await one<{ id: string }>(
+      `DELETE FROM ${spec.table} WHERE id = $1 RETURNING id`, [req.params.id]);
+    if (!row) throw notFound(spec.label);
+
+    await recordAudit(req, { action: 'settings.master_deleted', entityType: spec.table,
+      entityId: req.params.id, before: { resource: req.params.resource } });
+    res.json({ ok: true });
+  }));
 
 settingsRouter.post('/master/:resource', requirePermission('settings.manage'), asyncHandler(async (req, res) => {
   const spec = masterTables[req.params.resource];

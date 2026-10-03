@@ -61,6 +61,18 @@ const NAV_GROUPS: Array<{ label: string; items: NavItem[] }> = [
 ];
 
 /**
+ * Every permission that unlocks at least one menu item.
+ *
+ * Holding none of them means the whole portal is empty — no menu, and
+ * nothing the account is allowed to open. Derived from NAV_GROUPS rather
+ * than written out again, so a new menu item cannot be added without
+ * this keeping up.
+ */
+export const ADMIN_NAV_PERMISSIONS: PermissionKey[] = [
+  ...new Set(NAV_GROUPS.flatMap((g) => g.items.flatMap((i) => i.permissions ?? []))),
+];
+
+/**
  * How the side menu behaves on a desktop viewport.
  *
  *  pinned    always full width

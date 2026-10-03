@@ -29,6 +29,8 @@ export const PERMISSIONS = {
   'project.create':            { module: 'project',      description: 'Create projects' },
   'project.update':            { module: 'project',      description: 'Edit project details' },
   'project.assign_members':    { module: 'project',      description: 'Add or remove project members' },
+  'project.assign_manager':    { module: 'project',      description: 'Hand a project to a Project Manager' },
+  'project.assign_sales_manager': { module: 'project',   description: 'Put a Sales Manager in charge of a project' },
 
   // Work assignments
   'work.view.own':             { module: 'work',         description: 'View own assignments' },
@@ -82,20 +84,60 @@ export const PERMISSIONS = {
 export type PermissionKey = keyof typeof PERMISSIONS;
 export const ALL_PERMISSIONS = Object.keys(PERMISSIONS) as PermissionKey[];
 
-export const ROLE_KEYS = ['super_admin', 'ops_manager', 'finance_manager', 'employee'] as const;
+/*
+ * A project passes through three pairs of hands:
+ *
+ *   super_admin    creates it
+ *   sales_manager  hands it to a Project Manager
+ *   ops_manager    adds technicians and assigns activities
+ *
+ * `ops_manager` and `employee` keep their keys — renaming them would
+ * orphan every existing account, every stored permission override and
+ * every audit row — but they are labelled for what they now do.
+ */
+export const ROLE_KEYS = [
+  'super_admin', 'sales_manager', 'ops_manager', 'finance_manager', 'employee',
+] as const;
 export type RoleKey = (typeof ROLE_KEYS)[number];
 
 export const ROLE_LABELS: Record<RoleKey, string> = {
   super_admin:     'Super Admin',
-  ops_manager:     'Operations / Project Manager',
+  sales_manager:   'Sales Manager',
+  ops_manager:     'Project Manager',
   finance_manager: 'Finance / Accounts Manager',
-  employee:        'Employee / Field Staff',
+  employee:        'Technician / Field Staff',
 };
 
+/*
+ * A Sales Manager needs to see every project to find the ones still
+ * waiting for a manager, and every employee to choose one.
+ *
+ * They may also be put in charge of a project themselves, so they carry
+ * the permissions needed to run one. That is not as wide as it looks:
+ * every one of those is scoped per project by `manager_id = caller`, so
+ * it only ever applies to projects they have actually been given. It
+ * grants nothing on anyone else's.
+ */
+const SALES_MANAGER: PermissionKey[] = [
+  'dashboard.view',
+  'employee.view.own', 'employee.view.all',
+  'project.view.all', 'project.assign_manager',
+  // Running a project they have been made Project Manager of:
+  'project.view.managed', 'project.assign_members',
+  'work.view.team', 'work.create', 'work.update', 'work.cancel', 'work.review',
+  'expense.approve.manager',
+  'expense.create', 'expense.view.own',
+  'leave.apply', 'leave.view.own',
+  'attendance.record',
+  'report.view.own',
+  'settings.view',
+];
+
+// No 'project.create': a Project Manager runs projects, they no longer open them.
 const OPS_MANAGER: PermissionKey[] = [
   'dashboard.view',
   'employee.view.own', 'employee.view.team',
-  'project.view.assigned', 'project.view.managed', 'project.create', 'project.update', 'project.assign_members',
+  'project.view.assigned', 'project.view.managed', 'project.update', 'project.assign_members',
   'work.view.own', 'work.view.team', 'work.create', 'work.update', 'work.cancel', 'work.review',
   'work.acknowledge', 'work.progress',
   'time.log', 'time.verify', 'attendance.record',
@@ -132,6 +174,7 @@ const EMPLOYEE: PermissionKey[] = [
 
 export const ROLE_PERMISSIONS: Record<RoleKey, PermissionKey[]> = {
   super_admin:     ALL_PERMISSIONS,
+  sales_manager:   SALES_MANAGER,
   ops_manager:     OPS_MANAGER,
   finance_manager: FINANCE_MANAGER,
   employee:        EMPLOYEE,

@@ -184,6 +184,9 @@ body {
 /* Every interactive element clears the 44px minimum touch target. */
 button, a[role="button"], [role="tab"] { min-height: 44px; }
 .tap-sm { min-height: 36px; }
+/* Secondary controls that sit in a row together — the filter chips — where
+   36px each costs a line wrap. Still comfortably thumb-sized. */
+.tap-xs { min-height: 32px; }
 
 /* Field staff are often outdoors: lift contrast a notch in bright light. */
 @media (prefers-contrast: more) {

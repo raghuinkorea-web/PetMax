@@ -33,7 +33,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // A stored token, or an httpOnly refresh cookie from a previous visit.
     if (getToken()) void load();
     else {
-      void api.post('/auth/refresh')
+      void api.post('/auth/refresh', { app: 'admin' })
         .then((d: any) => { setToken(d.accessToken); setUser(d.user); })
         .catch(() => setUser(null))
         .finally(() => setLoading(false));
@@ -42,7 +42,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signIn = useCallback(async (identifier: string, password: string) => {
     const data = await api.post<{ accessToken: string; user: AuthUser }>('/auth/login',
-      { identifier, password, client: 'web' });
+      // `app` decides which refresh cookie this session owns. Without it the
+      // field app, on the same host, would share and overwrite ours.
+      { identifier, password, client: 'web', app: 'admin' });
     setToken(data.accessToken);
     setUser(data.user);
     return data.user;

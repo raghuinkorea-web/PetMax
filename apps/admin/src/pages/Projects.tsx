@@ -1,13 +1,23 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { FolderKanban, FolderPlus } from 'lucide-react';
+import { Clock, FolderKanban, FolderPlus } from 'lucide-react';
 import { PROJECT_STATUS, PRIORITY, dateLabel, hours, money, percent, type ProjectStatus } from '@adisys/shared';
 import { api, ApiRequestError } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { PageHeader } from '../components/AppShell';
 import { Column, DataTable, FilterBar, FilterSelect, SearchInput } from '../components/DataTable';
 import { Button, Checkbox, Field, Input, Modal, Select, StatusBadge, Textarea, cx, useToast } from '../components/ui';
+
+/** An unfilled seat on a project — stalled work, not a blank cell. */
+function Unassigned() {
+  return (
+    <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-warning">
+      <Clock className="h-3.5 w-3.5 shrink-0" aria-hidden />
+      Not assigned
+    </span>
+  );
+}
 
 export function ProjectsPage() {
   const { can } = useAuth();
@@ -38,7 +48,16 @@ export function ProjectsPage() {
         </div>
       ),
     },
-    { key: 'manager', header: 'Manager', hideBelow: 'lg', render: (p) => p.managerName },
+    {
+      key: 'salesManager', header: 'Sales manager', hideBelow: 'xl',
+      render: (p) => p.salesManagerName ?? <Unassigned />,
+    },
+    {
+      key: 'manager', header: 'Project manager', hideBelow: 'lg',
+      // An empty seat is stalled work, not merely a blank cell — so it is
+      // named as such rather than shown as "—".
+      render: (p) => p.managerName ?? <Unassigned />,
+    },
     {
       key: 'status', header: 'Status', sortable: true,
       render: (p) => {
@@ -152,13 +171,14 @@ export function ProjectsPage() {
 function CreateProjectModal({ onClose, onCreated }: { onClose: () => void; onCreated: (id: string) => void }) {
   const toast = useToast();
   const today = new Date().toISOString().slice(0, 10);
+  // The Project Manager and the team belong to later steps and the server
+  // rejects them here; the Sales Manager is the Admin's to choose.
   const [form, setForm] = useState({
     name: '', clientName: '', clientLocation: '', description: '', projectTypeId: '',
-    managerId: '', startDate: today, expectedEndDate: '', status: 'draft',
+    salesManagerId: '', startDate: today, expectedEndDate: '', status: 'draft',
     priority: 'medium', budgetAmount: '', notes: '',
   });
   const [budgetEnabled, setBudgetEnabled] = useState(false);
-  const [memberIds, setMemberIds] = useState<string[]>([]);
   const [error, setError] = useState<ApiRequestError | null>(null);
 
   const lookups = useQuery({ queryKey: ['lookups'], queryFn: () => api.get('/lookups'), staleTime: 600_000 });
@@ -166,9 +186,7 @@ function CreateProjectModal({ onClose, onCreated }: { onClose: () => void; onCre
     queryKey: ['employees', 'all-active'],
     queryFn: () => api.get('/employees', { size: 100, status: 'active' }),
   });
-
-  const managers = (staff.data?.data ?? []).filter((e: any) =>
-    e.roleKey === 'ops_manager' || e.roleKey === 'super_admin');
+  const salesManagers = (staff.data?.data ?? []).filter((e: any) => e.roleKey === 'sales_manager');
 
   const create = useMutation({
     mutationFn: () => api.post('/projects', {
@@ -180,10 +198,10 @@ function CreateProjectModal({ onClose, onCreated }: { onClose: () => void; onCre
       clientLocation: form.clientLocation || undefined,
       description: form.description || undefined,
       notes: form.notes || undefined,
-      memberIds,
+      salesManagerId: form.salesManagerId || undefined,
     }),
     onSuccess: (res) => {
-      toast.success('Project created', `${res.projectCode} — add work assignments next.`);
+      toast.success('Project created', `${res.projectCode} — a Sales Manager assigns the Project Manager next.`);
       onCreated(res.id);
     },
     onError: (err) => {
@@ -193,7 +211,7 @@ function CreateProjectModal({ onClose, onCreated }: { onClose: () => void; onCre
   });
 
   const set = (k: keyof typeof form) => (e: any) => setForm((f) => ({ ...f, [k]: e.target.value }));
-  const canSubmit = form.name.trim().length >= 3 && form.clientName.trim().length >= 2 && form.managerId;
+  const canSubmit = form.name.trim().length >= 3 && form.clientName.trim().length >= 2;
 
   return (
     <Modal open onClose={onClose} size="lg" title="Create project"
@@ -228,11 +246,16 @@ function CreateProjectModal({ onClose, onCreated }: { onClose: () => void; onCre
               {(lookups.data?.projectTypes ?? []).map((t: any) => <option key={t.id} value={t.id}>{t.name}</option>)}
             </Select>
           </Field>
-          <Field label="Project manager" required error={error?.fieldError('managerId')}
-                 hint="Approves work completion and expenses at the manager stage.">
-            <Select value={form.managerId} onChange={set('managerId')}>
-              <option value="">Select a manager…</option>
-              {managers.map((m: any) => <option key={m.id} value={m.id}>{m.fullName} ({m.employeeCode})</option>)}
+          <Field label="Sales manager" error={error?.fieldError('salesManagerId')}
+                 hint={salesManagers.length
+                   ? 'Owns the hand-over to a Project Manager. Can be set later.'
+                   : 'Nobody holds the Sales Manager role yet — set one on the Employees screen.'}>
+            <Select value={form.salesManagerId} onChange={set('salesManagerId')}
+                    disabled={!salesManagers.length}>
+              <option value="">Assign later</option>
+              {salesManagers.map((m: any) => (
+                <option key={m.id} value={m.id}>{m.fullName} ({m.employeeCode})</option>
+              ))}
             </Select>
           </Field>
           <Field label="Priority">
@@ -265,22 +288,16 @@ function CreateProjectModal({ onClose, onCreated }: { onClose: () => void; onCre
           )}
         </div>
 
-        <Field label={`Assign team${memberIds.length ? ` — ${memberIds.length} selected` : ''}`}
-               hint="You can add more people later from the project page.">
-          <div className="max-h-44 overflow-y-auto rounded-lg ring-1 ring-line-strong">
-            <ul className="divide-y divide-line">
-              {(staff.data?.data ?? []).map((m: any) => (
-                <li key={m.id} className="px-3 py-2">
-                  <Checkbox label={m.fullName}
-                    description={`${m.employeeCode}${m.designationName ? ` · ${m.designationName}` : ''}`}
-                    checked={memberIds.includes(m.id)}
-                    onChange={(e) => setMemberIds((ids) =>
-                      e.target.checked ? [...ids, m.id] : ids.filter((i) => i !== m.id))} />
-                </li>
-              ))}
-            </ul>
-          </div>
-        </Field>
+        {/* Neither the manager nor the team is chosen here any more: this
+            screen is step 1 of three, and saying so is clearer than leaving
+            a gap where two fields used to be. */}
+        <div className="rounded-lg bg-info-soft px-3.5 py-3 text-sm text-ink-700 ring-1 ring-inset ring-info/20">
+          <p className="font-semibold text-ink-900">What happens next</p>
+          <ol className="mt-1.5 list-decimal space-y-0.5 pl-4 leading-relaxed">
+            <li>The <strong>Sales Manager</strong> hands this project to a Project Manager.</li>
+            <li>That <strong>Project Manager</strong> adds the technicians and assigns their activities.</li>
+          </ol>
+        </div>
 
         <Field label="Initial status"
                hint="Field staff only see Active and On hold projects.">

@@ -72,11 +72,35 @@ async function buildAuthUser(userId: string) {
   };
 }
 
+/*
+ * Which front-end is signing in, and therefore which refresh cookie this
+ * session owns.
+ *
+ * Cookies are scoped by host, NOT by port, so the admin portal and the
+ * field app — both served from localhost, and from the same host in any
+ * single-domain deployment — were sharing one `adisys_rt`. Signing into
+ * one silently took over the other: an admin's tab would quietly become
+ * whichever technician last logged in on the same machine, and every
+ * admin action after that failed. One cookie per app keeps the two
+ * sessions genuinely separate.
+ */
+const APPS = ['admin', 'field'] as const;
+type AppName = (typeof APPS)[number];
+const appSchema = z.enum(APPS).default('admin');
+
+const refreshCookieName = (app: AppName) => `adisys_rt_${app}`;
+
+const REFRESH_COOKIE = {
+  httpOnly: true, sameSite: 'lax' as const, secure: config.isProd,
+  path: '/api/auth', maxAge: config.jwt.refreshTtlDays * 86_400_000,
+};
+
 const loginSchema = z.object({
   // Employee ID, email or mobile number — field staff remember their ID.
   identifier: z.string().trim().min(3, 'Enter your employee ID, email or mobile number'),
   password: z.string().min(1, 'Enter your password'),
   client: z.enum(['web', 'android', 'ios']).default('web'),
+  app: appSchema,
   deviceLabel: z.string().trim().max(120).optional(),
 });
 
@@ -135,10 +159,7 @@ authRouter.post('/login', loginLimiter, asyncHandler(async (req, res) => {
   req.principal = { id: user.id, roleKey: user.role_key } as any;
   await recordAudit(req, { action: 'auth.login', entityType: 'user', entityId: user.id, after: { client: body.client } });
 
-  res.cookie('adisys_rt', session.refreshToken, {
-    httpOnly: true, sameSite: 'lax', secure: config.isProd,
-    path: '/api/auth', maxAge: config.jwt.refreshTtlDays * 86_400_000,
-  });
+  res.cookie(refreshCookieName(body.app), session.refreshToken, REFRESH_COOKIE);
 
   res.json({
     accessToken: session.accessToken,
@@ -149,7 +170,10 @@ authRouter.post('/login', loginLimiter, asyncHandler(async (req, res) => {
 }));
 
 authRouter.post('/refresh', asyncHandler(async (req, res) => {
-  const token = (req.body?.refreshToken as string | undefined) ?? req.cookies?.adisys_rt;
+  const app = appSchema.parse(req.body?.app);
+  // Only this app's own cookie is read, so the other app's session can
+  // neither be picked up by mistake nor be invalidated by reuse detection.
+  const token = (req.body?.refreshToken as string | undefined) ?? req.cookies?.[refreshCookieName(app)];
   if (!token) throw unauthorized('No refresh token supplied.');
 
   let claims: { sub: string; sid: string };
@@ -198,10 +222,7 @@ authRouter.post('/refresh', asyncHandler(async (req, res) => {
   if (!result.session) throw unauthorized('Your session has expired. Please sign in again.');
 
   const session = await issueSession(result.session.userId, result.session.roleKey, result.session.client, req);
-  res.cookie('adisys_rt', session.refreshToken, {
-    httpOnly: true, sameSite: 'lax', secure: config.isProd,
-    path: '/api/auth', maxAge: config.jwt.refreshTtlDays * 86_400_000,
-  });
+  res.cookie(refreshCookieName(app), session.refreshToken, REFRESH_COOKIE);
   res.json({
     accessToken: session.accessToken,
     refreshToken: session.refreshToken,
@@ -214,6 +235,9 @@ authRouter.post('/logout', authenticate, asyncHandler(async (req, res) => {
   const p = principalOf(req);
   await query(`UPDATE auth_sessions SET revoked_at = now() WHERE id = $1 AND revoked_at IS NULL`, [p.sessionId]);
   await recordAudit(req, { action: 'auth.logout', entityType: 'user', entityId: p.id });
+  // Clear both names: this app's cookie, plus the pre-split `adisys_rt`
+  // still sitting in browsers that signed in before this change.
+  for (const app of APPS) res.clearCookie(refreshCookieName(app), { path: '/api/auth' });
   res.clearCookie('adisys_rt', { path: '/api/auth' });
   res.json({ ok: true });
 }));

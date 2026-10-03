@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Save, ShieldAlert } from 'lucide-react';
+import { Plus, RotateCcw, Save, ShieldAlert, Trash2 } from 'lucide-react';
 import { money } from '@adisys/shared';
 import { api, ApiRequestError } from '../lib/api';
 import { useAuth } from '../lib/auth';
@@ -10,10 +10,11 @@ import {
   StatusBadge, Tabs, cx, useToast,
 } from '../components/ui';
 
-type Section = 'organization' | 'productivity' | 'expense' | 'notification' | 'security';
+type Section = 'organization' | 'lists' | 'productivity' | 'expense' | 'notification' | 'security';
 
 const SECTIONS: Array<{ key: Section; label: string; description: string }> = [
   { key: 'organization', label: 'Organisation', description: 'Company details and working hours.' },
+  { key: 'lists', label: 'Lists', description: 'The options behind the dropdowns across the product.' },
   { key: 'productivity', label: 'Productivity', description: 'Time tracking rules and the location policy.' },
   { key: 'expense', label: 'Expenses', description: 'Claim rules, categories and approval policies.' },
   { key: 'notification', label: 'Notifications', description: 'Channels and reminder timing.' },
@@ -46,6 +47,7 @@ export function SettingsPage() {
             {docs.map((doc: any) => (
               <SettingsDocument key={`${doc.scope}.${doc.key}`} doc={doc} editable={can('settings.manage')} />
             ))}
+            {section === 'lists' && <MasterLists editable={can('settings.manage')} />}
             {section === 'expense' && <ExpenseCategories editable={can('settings.manage')} />}
             {section === 'expense' && <ExpensePolicies />}
           </>
@@ -195,6 +197,152 @@ function SettingField({ name, value, editable, error, onChange }: {
 }
 
 /* =================================================================== */
+/* ===================================================================
+   The lists behind the dropdowns — work types, project types,
+   departments, designations and work locations.
+   =================================================================== */
+function MasterLists({ editable }: { editable: boolean }) {
+  const lists = useQuery({ queryKey: ['master'], queryFn: () => api.get('/settings/master') });
+
+  if (lists.isLoading) return <Card><Skeleton className="h-64 w-full" /></Card>;
+
+  return (
+    <>
+      <Card className="bg-info-soft ring-info/20">
+        <p className="text-sm leading-relaxed text-ink-700">
+          These are the options people pick from across the product. Turning one <strong>off</strong> removes
+          it from every dropdown while leaving existing records untouched, which is almost always what you
+          want. <strong>Delete</strong> is only offered for an option nothing has ever used.
+        </p>
+      </Card>
+
+      {Object.entries(lists.data ?? {}).map(([resource, list]: [string, any]) => (
+        <MasterList key={resource} resource={resource} list={list} editable={editable} />
+      ))}
+    </>
+  );
+}
+
+function MasterList({ resource, list, editable }: { resource: string; list: any; editable: boolean }) {
+  const toast = useToast();
+  const qc = useQueryClient();
+  const [adding, setAdding] = useState(false);
+  const [draft, setDraft] = useState<Record<string, string>>({});
+
+  const done = (msg: string) => {
+    toast.success(msg);
+    void qc.invalidateQueries({ queryKey: ['master'] });
+    // The dropdowns everywhere else read /lookups, so it must be refetched
+    // too or the change will not show until a reload.
+    void qc.invalidateQueries({ queryKey: ['lookups'] });
+  };
+
+  const add = useMutation({
+    mutationFn: () => api.post(`/settings/master/${resource}`, draft),
+    onSuccess: () => { setAdding(false); setDraft({}); done(`${list.label} added`); },
+    onError: (e) => toast.error(`Could not add the ${list.label.toLowerCase()}`, (e as Error).message),
+  });
+
+  const toggle = useMutation({
+    mutationFn: (row: any) => api.patch(`/settings/master/${resource}/${row.id}`, { active: !row.active }),
+    onSuccess: (_d, row: any) => done(row.active ? `${list.label} turned off` : `${list.label} turned back on`),
+    onError: (e) => toast.error('Could not change it', (e as Error).message),
+  });
+
+  const remove = useMutation({
+    mutationFn: (row: any) => api.del(`/settings/master/${resource}/${row.id}`),
+    onSuccess: () => done(`${list.label} deleted`),
+    onError: (e) => toast.error('Could not delete it', (e as Error).message),
+  });
+
+  const primary = list.fields.length > 1 ? list.fields[1] : list.fields[0];
+  const canAdd = Boolean(draft[primary]?.trim());
+
+  return (
+    <Card>
+      <CardHeader title={list.plural}
+        subtitle={`${list.data.filter((r: any) => r.active).length} in use`}
+        // Naming the list on the button, not just "Add": five of these cards
+        // sit one under another, and an unlabelled button on the wrong one is
+        // indistinguishable until the item fails to appear where you expect.
+        action={editable && !adding && (
+          <Button size="sm" variant="primary" icon={<Plus className="h-3.5 w-3.5" />}
+                  onClick={() => setAdding(true)}>Add {list.label.toLowerCase()}</Button>
+        )} />
+
+      {adding && (
+        <div className="mt-3 rounded-lg bg-sunken p-3">
+          <p className="mb-2.5 text-sm font-semibold text-ink-900">New {list.label.toLowerCase()}</p>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {list.fields.map((f: string) => (
+              <Field key={f} label={`${list.label} ${labelFor(f).toLowerCase()}`} required={f === primary}>
+                <Input value={draft[f] ?? ''} autoFocus={f === list.fields[0]}
+                       onChange={(e) => setDraft((d) => ({ ...d, [f]: e.target.value }))} />
+              </Field>
+            ))}
+          </div>
+          <div className="mt-3 flex gap-2">
+            <Button size="sm" onClick={() => { setAdding(false); setDraft({}); }}>Cancel</Button>
+            <Button size="sm" variant="primary" disabled={!canAdd} loading={add.isPending}
+                    onClick={() => add.mutate()}>Add {list.label.toLowerCase()}</Button>
+          </div>
+        </div>
+      )}
+
+      {list.data.length === 0 ? (
+        <EmptyState title={`No ${list.plural.toLowerCase()} yet`}
+          description="Add one and it will appear in the matching dropdown." />
+      ) : (
+        <ul className="mt-3 divide-y divide-line">
+          {list.data.map((row: any) => (
+            <li key={row.id} className="flex flex-wrap items-center justify-between gap-3 py-2.5">
+              <div className="min-w-0">
+                <p className={cx('truncate font-medium', row.active ? 'text-ink-900' : 'text-ink-400 line-through')}>
+                  {list.fields.map((f: string) => row[f]).filter(Boolean).join(' · ')}
+                </p>
+                <p className="mt-0.5 text-xs text-ink-500">
+                  {row.usageCount > 0
+                    ? `Used by ${row.usageCount} record${row.usageCount === 1 ? '' : 's'}`
+                    : 'Not used yet'}
+                  {!row.active && ' · hidden from dropdowns'}
+                </p>
+              </div>
+              {editable && (
+                <div className="flex shrink-0 items-center gap-1.5">
+                  <Button size="sm" loading={toggle.isPending}
+                          icon={row.active ? undefined : <RotateCcw className="h-3.5 w-3.5" />}
+                          onClick={() => toggle.mutate(row)}>
+                    {row.active ? 'Turn off' : 'Turn on'}
+                  </Button>
+                  {/* Offered only when nothing references it. The server
+                      refuses either way; hiding it avoids a dead button. */}
+                  {row.usageCount === 0 && (
+                    <Button size="sm" variant="ghost" icon={<Trash2 className="h-3.5 w-3.5" />}
+                            loading={remove.isPending}
+                            onClick={() => {
+                              if (confirm(`Delete "${row[primary]}" permanently? `
+                                + 'Nothing uses it, so this is safe — but it cannot be undone.')) {
+                                remove.mutate(row);
+                              }
+                            }}>
+                      Delete
+                    </Button>
+                  )}
+                </div>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+    </Card>
+  );
+}
+
+const labelFor = (field: string) => ({
+  code: 'Code', name: 'Name', grade: 'Grade',
+  addressLine: 'Address', city: 'City', state: 'State',
+}[field] ?? field);
+
 function ExpenseCategories({ editable }: { editable: boolean }) {
   const toast = useToast();
   const qc = useQueryClient();

@@ -38,7 +38,8 @@ async function refreshAccessToken(): Promise<string | null> {
     try {
       const res = await fetch(`${BASE}/auth/refresh`, {
         method: 'POST', credentials: 'include',
-        headers: { 'Content-Type': 'application/json' }, body: '{}',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ app: 'admin' }),
       });
       if (!res.ok) return null;
       const data = await res.json();
@@ -80,8 +81,16 @@ export async function request<T = any>(path: string, options: RequestOptions = {
 
   let res = await send(accessToken);
 
-  // One transparent refresh-and-retry on expiry.
-  if (res.status === 401 && accessToken) {
+  /*
+   * One transparent refresh-and-retry on a 401.
+   *
+   * This deliberately runs even when there is no access token to begin
+   * with. A tab that has lost its token but still holds a valid refresh
+   * cookie used to send an unauthenticated request and surface the raw
+   * "Authentication required" to the user, with no way back other than
+   * a manual reload — instead of simply refreshing and carrying on.
+   */
+  if (res.status === 401) {
     const fresh = await refreshAccessToken();
     if (fresh) res = await send(fresh);
     else setToken(null);

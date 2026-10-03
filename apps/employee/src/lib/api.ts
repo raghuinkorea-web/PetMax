@@ -48,7 +48,7 @@ async function refreshAccessToken(): Promise<string | null> {
         headers: { 'Content-Type': 'application/json' },
         // Native wrappers have no cookie jar, so the refresh token is sent
         // explicitly from secure storage.
-        body: JSON.stringify({ refreshToken }),
+        body: JSON.stringify({ refreshToken, app: 'field' }),
       });
       if (!res.ok) return null;
       const data = await res.json();
@@ -91,8 +91,10 @@ export async function request<T = any>(path: string, options: RequestOptions = {
 
   let res = await send(accessToken);
 
-  // One transparent refresh-and-retry on expiry.
-  if (res.status === 401 && accessToken) {
+  // One transparent refresh-and-retry on a 401 — including when there is no
+  // access token to start with, since a stored refresh token can still
+  // recover the session rather than stranding the user on an error.
+  if (res.status === 401) {
     const fresh = await refreshAccessToken();
     if (fresh) res = await send(fresh);
     else setToken(null);

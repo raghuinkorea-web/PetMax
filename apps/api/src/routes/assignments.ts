@@ -257,12 +257,17 @@ assignmentRouter.post('/', requirePermission('work.create'), asyncHandler(async 
   const p = principalOf(req);
   const body = parse(createSchema, req.body);
 
-  const project = await one<{ id: string; name: string; status: string; manager_id: string }>(
+  const project = await one<{ id: string; name: string; status: string; manager_id: string | null }>(
     `SELECT id, name, status, manager_id FROM projects WHERE id = $1 AND deleted_at IS NULL`,
     [body.projectId]);
   if (!project) throw notFound('Project');
   if (!['active', 'on_hold'].includes(project.status)) {
     throw badRequest(`Work cannot be assigned to a ${project.status.replace('_', ' ')} project.`);
+  }
+  // Activities are the Project Manager's to assign, so there has to be one.
+  if (!project.manager_id) {
+    throw conflict('This project has no Project Manager yet. A Sales Manager assigns one before '
+      + 'activities can be given out.', 'NO_PROJECT_MANAGER');
   }
   if (project.manager_id !== p.id && !can(req, 'work.view.all')) {
     throw forbidden('You can only assign work on projects you manage.');

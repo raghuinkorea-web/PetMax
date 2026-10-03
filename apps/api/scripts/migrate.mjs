@@ -6,6 +6,9 @@
  * silently skipped.
  */
 import { createHash } from 'node:crypto';
+
+const sha256 = (s) => createHash('sha256').update(s).digest('hex');
+
 import { readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -39,10 +42,26 @@ try {
   let count = 0;
   for (const file of files) {
     const sql = await readFile(path.join(MIGRATIONS_DIR, file), 'utf8');
-    const checksum = createHash('sha256').update(sql).digest('hex');
+    /*
+     * Hash with line endings normalised. Git rewrites CRLF/LF on checkout,
+     * stash and clone, so on Windows an untouched migration would otherwise
+     * look edited and halt every deployment. Only the bytes that change
+     * meaning are hashed.
+     */
+    const checksum = sha256(sql.replace(/\r\n/g, '\n'));
 
     if (appliedMap.has(file)) {
-      if (appliedMap.get(file) !== checksum) {
+      const recorded = appliedMap.get(file);
+      if (recorded !== checksum) {
+        // A checksum recorded before normalisation still matches the raw
+        // bytes. That proves the file is unchanged, so re-record it rather
+        // than blocking on a difference that is purely line endings.
+        if (recorded === sha256(sql)) {
+          await client.query('UPDATE schema_migrations SET checksum = $2 WHERE filename = $1',
+            [file, checksum]);
+          console.log(`  · ${file} — checksum re-recorded (line endings only)`);
+          continue;
+        }
         throw new Error(
           `Migration ${file} has changed since it was applied.\n` +
           `Migrations are immutable — add a new migration instead of editing this one.`);

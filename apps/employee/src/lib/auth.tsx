@@ -47,7 +47,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (getToken()) void load();
     else {
-      void api.post('/auth/refresh')
+      void api.post('/auth/refresh', { app: 'field' })
         .then((d: any) => { setToken(d.accessToken); setRefreshToken(d.refreshToken ?? null); setUser(d.user); })
         .catch(() => setUser(null))
         .finally(() => setLoading(false));
@@ -60,7 +60,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signIn = useCallback(async (identifier: string, password: string) => {
     const data = await api.post<{ accessToken: string; refreshToken: string; user: AuthUser }>(
-      '/auth/login', { identifier, password, client: 'android', deviceLabel: deviceLabel() });
+      // `app: 'field'` keeps this session's refresh cookie separate from the
+      // admin portal's — they share a host, and cookies ignore ports.
+      '/auth/login', { identifier, password, client: 'android', app: 'field', deviceLabel: deviceLabel() });
     setToken(data.accessToken);
     setRefreshToken(data.refreshToken ?? null);
     setUser(data.user);

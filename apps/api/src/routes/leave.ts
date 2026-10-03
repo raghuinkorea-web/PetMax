@@ -222,17 +222,67 @@ leaveRouter.post('/:id/decision', requirePermission('leave.approve'), asyncHandl
   res.json({ ok: true, status: result.status });
 }));
 
-/** An employee may withdraw their own request while it is still pending. */
-leaveRouter.post('/:id/cancel', requirePermission('leave.apply'), asyncHandler(async (req, res) => {
+/**
+ * Cancel a request.
+ *
+ * Two different acts share this route:
+ *   - an employee withdrawing their OWN request while it is still pending;
+ *   - an approver calling off a pending or already-approved one, because the
+ *     work cannot be covered or the employee came back early.
+ *
+ * Cancelling an approved request releases those dates: the employee stops
+ * being On Leave and work can be assigned on them again, so the employee is
+ * told. A rejected request is already final and cannot be cancelled.
+ */
+leaveRouter.post('/:id/cancel', asyncHandler(async (req, res) => {
   const p = principalOf(req);
-  const lr = await one<{ user_id: string; status: string }>(
-    `SELECT user_id, status FROM leave_requests WHERE id = $1`, [req.params.id]);
-  if (!lr) throw notFound('Leave request');
-  if (lr.user_id !== p.id && !can(req, 'leave.approve')) throw forbidden('This is not your leave request.');
-  if (lr.status !== 'pending') throw conflict('Only a pending request can be withdrawn.', 'LEAVE_NOT_PENDING');
+  const body = parse(z.object({ note: z.string().trim().max(500).optional() }), req.body ?? {});
 
-  await query(`UPDATE leave_requests SET status = 'cancelled', updated_at = now() WHERE id = $1`, [req.params.id]);
+  const lr = await one<any>(
+    `SELECT lr.user_id, lr.status, lr.from_date, lr.to_date, lt.name AS type_name
+       FROM leave_requests lr JOIN leave_types lt ON lt.id = lr.leave_type_id
+      WHERE lr.id = $1`, [req.params.id]);
+  if (!lr) throw notFound('Leave request');
+
+  const isOwner = lr.user_id === p.id;
+  const isApprover = can(req, 'leave.approve');
+  if (!isOwner && !isApprover) throw forbidden('This is not your leave request.');
+
+  if (lr.status === 'cancelled') throw conflict('This request is already cancelled.', 'LEAVE_ALREADY_CANCELLED');
+  if (lr.status === 'rejected') {
+    throw conflict('A rejected request cannot be cancelled.', 'LEAVE_REJECTED');
+  }
+  if (lr.status === 'approved' && !isApprover) {
+    throw forbidden('Approved leave can only be cancelled by an approver.');
+  }
+
+  // An approver's cancellation is attributable; an employee's own withdrawal
+  // is not, which is what the 010 constraint allows for.
+  const attribute = isApprover && !isOwner;
+  // The casts matter: decided_by is null for a self-withdrawal, and Postgres
+  // cannot infer a type for a bare null parameter.
+  await query(
+    `UPDATE leave_requests
+        SET status = 'cancelled', updated_at = now(),
+            decided_by = $2::uuid,
+            decided_at = CASE WHEN $2::uuid IS NULL THEN NULL ELSE now() END,
+            decision_note = COALESCE($3::text, decision_note)
+      WHERE id = $1::uuid`,
+    [req.params.id, attribute ? p.id : null, body.note ?? null]);
+
+  if (attribute) {
+    await notify({
+      userId: lr.user_id,
+      type: 'leave.rejected',   // the closest existing channel: the leave will not happen
+      severity: 'warning',
+      title: lr.status === 'approved' ? 'Approved leave cancelled' : 'Leave request cancelled',
+      body: `${lr.type_name}, ${lr.from_date} to ${lr.to_date}`
+        + (body.note ? ` — ${body.note}` : ''),
+      entityType: 'leave_request', entityId: req.params.id,
+    });
+  }
+
   await recordAudit(req, { action: 'leave.cancelled', entityType: 'leave_request', entityId: req.params.id,
-    before: { status: 'pending' }, after: { status: 'cancelled' } });
+    before: { status: lr.status }, after: { status: 'cancelled', note: body.note ?? null } });
   res.json({ ok: true, status: 'cancelled' });
 }));

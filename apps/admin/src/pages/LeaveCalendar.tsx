@@ -1,8 +1,9 @@
-import { useMemo, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { CalendarDays, ChevronLeft, ChevronRight } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { CalendarDays, ChevronLeft, ChevronRight, Loader2, PartyPopper } from 'lucide-react';
 import { LEAVE_STATUS, dateLabel, type LeaveStatus } from '@adisys/shared';
 import { api } from '../lib/api';
+import { useAuth } from '../lib/auth';
 import { PageHeader } from '../components/AppShell';
 import { Card, ErrorState, Skeleton, StatusBadge, cx } from '../components/ui';
 
@@ -26,12 +27,52 @@ function gridFor(month: string): Date[] {
 }
 
 export function LeaveCalendarPage() {
+  const { can } = useAuth();
+  const qc = useQueryClient();
   const [month, setMonth] = useState(monthKey(new Date()));
+  const year = Number(month.slice(0, 4));
 
   const query = useQuery({
     queryKey: ['leave', 'calendar', month],
     queryFn: () => api.get('/leave/calendar', { month }),
   });
+
+  const holidays = useQuery({
+    queryKey: ['holidays', year],
+    queryFn: () => api.get('/holidays', { year, observedOnly: true }),
+    staleTime: 600_000,
+  });
+
+  /*
+   * Load the year's official holidays the first time a year is opened with
+   * none stored. It runs once per year per session — the ref stops a slow
+   * import from firing again on re-render — and only for someone who may
+   * manage settings, since importing writes to the holiday table.
+   */
+  const attempted = useRef<Set<number>>(new Set());
+  const importYear = useMutation({
+    mutationFn: (y: number) => api.post('/holidays/import', { year: y }),
+    onSettled: () => { void qc.invalidateQueries({ queryKey: ['holidays'] }); },
+  });
+
+  useEffect(() => {
+    if (!can('settings.manage')) return;
+    if (holidays.isLoading || holidays.isError) return;
+    if ((holidays.data?.data?.length ?? 0) > 0) return;
+    if (attempted.current.has(year)) return;
+    attempted.current.add(year);
+    importYear.mutate(year);
+  }, [year, holidays.data, holidays.isLoading, holidays.isError, can]);
+
+  /** date -> holiday name, for the cells. */
+  const holidayByDate = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const h of holidays.data?.data ?? []) {
+      // Two entries can share a date (the source lists variants); join them.
+      map.set(h.date, map.has(h.date) ? `${map.get(h.date)} · ${h.name}` : h.name);
+    }
+    return map;
+  }, [holidays.data]);
 
   const days = useMemo(() => gridFor(month), [month]);
 
@@ -63,9 +104,17 @@ export function LeaveCalendarPage() {
     <>
       <PageHeader
         title="Leave Calendar"
-        description="Approved and pending leave across your team. Pending entries are outlined; approved entries are filled."
+        description="Approved and pending leave across your team, with the year's official holidays. Pending entries are outlined; approved entries are filled."
         actions={
           <div className="flex items-center gap-1">
+            <span className="mr-2 inline-flex items-center gap-1.5 text-xs text-ink-600">
+              {importYear.isPending ? (
+                <><Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden /> Loading {year} holidays…</>
+              ) : (
+                <><PartyPopper className="h-3.5 w-3.5 text-brand-600" aria-hidden />
+                  {holidays.data?.data?.length ?? 0} holidays in {year}</>
+              )}
+            </span>
             <button onClick={() => shiftMonth(-1)} aria-label="Previous month"
               className="rounded-lg p-2 text-ink-600 hover:bg-ink-100 hover:text-ink-900">
               <ChevronLeft className="h-4 w-4" />
@@ -86,26 +135,75 @@ export function LeaveCalendarPage() {
           <Card><Skeleton className="h-96" /></Card>
         ) : (
           <>
+            {/*
+              One grid holds the weekday headers AND the day cells, so the two
+              share the same column tracks. As two separate grids they lined up
+              only by coincidence, and any difference in padding or a scrollbar
+              would shift the dates out from under their headers.
+
+              Everything in a column also shares the same left inset — headers,
+              date numbers and chips all sit at px-2 — so Monday's date is
+              flush under the Monday heading.
+            */}
             <Card padded={false} className="overflow-hidden">
-              <div className="grid grid-cols-7 border-b border-line bg-sunken/60">
-                {WEEKDAYS.map((d) => (
-                  <div key={d} className="px-2 py-2 text-center text-xs font-bold text-ink-600">{d}</div>
-                ))}
-              </div>
               <div className="grid grid-cols-7">
-                {days.map((d) => {
+                {WEEKDAYS.map((d) => (
+                  <div key={d}
+                    className={cx('border-b border-line px-2 py-2 text-xs font-bold',
+                                  // Sunday is the organisation's rest day (the work week is
+                                  // Mon–Sat), so its whole column is dark blue, header included.
+                                  d === 'Sun' ? 'bg-navy-900 text-white' : 'bg-sunken/60 text-ink-600')}>
+                    {d}
+                  </div>
+                ))}
+
+                {days.map((d, i) => {
                   const key = iso(d);
                   const inMonth = key.slice(0, 7) === month;
                   const entries = byDate.get(key) ?? [];
+                  const holiday = holidayByDate.get(key);
+                  const isSunday = d.getDay() === 0;
+
+                  /*
+                   * Exactly one background per cell. Two bg-* utilities on the
+                   * same element are decided by their order in the generated
+                   * stylesheet, not by the order written here, so stacking them
+                   * would tint cells unpredictably.
+                   *
+                   * Sunday wins so the column stays unbroken down the month,
+                   * including the leading and trailing days of the neighbouring
+                   * months — a gap in the stripe would read as a mistake. A
+                   * holiday falling on a Sunday still shows its name.
+                   */
+                  const background =
+                    isSunday ? (inMonth ? 'bg-navy-900' : 'bg-navy-900/60')
+                    : !inMonth ? 'bg-sunken/40'
+                    : holiday ? 'bg-brand-50/70'
+                    : undefined;
+
+                  // Dark blue needs light type; every other cell keeps the ink scale.
+                  const dateClass = isSunday
+                    ? (inMonth ? 'font-semibold text-white' : 'text-white/45')
+                    : (inMonth ? 'font-semibold text-ink-700' : 'text-ink-400');
+
                   return (
                     <div key={key}
-                      className={cx('min-h-[6.5rem] border-b border-r border-line p-1.5 last:border-r-0',
-                                    !inMonth && 'bg-sunken/40',
+                      className={cx('min-h-[6.5rem] border-b border-line px-2 py-1.5',
+                                    // Right border on every cell except the last of each row,
+                                    // so the grid does not end on a stray line.
+                                    (i + 1) % 7 !== 0 && 'border-r',
+                                    background,
                                     key === today && 'ring-1 ring-inset ring-brand-500')}>
-                      <div className={cx('tabular mb-1 px-0.5 text-xs',
-                                         inMonth ? 'font-semibold text-ink-700' : 'text-ink-400')}>
+                      <div className={cx('tabular mb-1 text-xs', dateClass)}>
                         {d.getDate()}
                       </div>
+                      {holiday && (
+                        <p title={holiday}
+                           className={cx('mb-1 truncate text-[12px] font-semibold leading-tight',
+                                         isSunday ? 'text-brand-300' : 'text-brand-700')}>
+                          {holiday}
+                        </p>
+                      )}
                       <ul className="space-y-1">
                         {entries.slice(0, 3).map((e) => (
                           <li key={e.id}>
@@ -119,7 +217,7 @@ export function LeaveCalendarPage() {
                           </li>
                         ))}
                         {entries.length > 3 && (
-                          <li className="px-1.5 text-[12px] text-ink-500">+{entries.length - 3} more</li>
+                          <li className="text-[12px] text-ink-500">+{entries.length - 3} more</li>
                         )}
                       </ul>
                     </div>

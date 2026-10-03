@@ -4,17 +4,18 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from 'recharts';
-import { ArrowLeft, Download, UserMinus, UserPlus } from 'lucide-react';
+import { ArrowLeft, Clock, Download, UserCheck, UserMinus, UserPlus } from 'lucide-react';
 import {
-  METRIC_DEFINITIONS, PRIORITY, PROJECT_STATUS, WORK_STATUS, dateLabel, hours, money, percent,
-  type ProjectStatus, type WorkStatus,
+  METRIC_DEFINITIONS, PRIORITY, PROJECT_STATUS, ROLE_LABELS, WORK_STATUS,
+  dateLabel, hours, money, percent,
+  type ProjectStatus, type RoleKey, type WorkStatus,
 } from '@adisys/shared';
 import { api, downloadCsv } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { PageHeader } from '../components/AppShell';
 import {
-  Button, Card, CardHeader, Checkbox, EmptyState, ErrorState, InfoTip, Modal, Skeleton,
-  StatusBadge, Tabs, cx, useToast,
+  Button, Card, CardHeader, Checkbox, EmptyState, ErrorState, Field, InfoTip, Modal, Select,
+  Skeleton, StatusBadge, Tabs, Textarea, cx, useToast,
 } from '../components/ui';
 import { AXIS_PROPS, BAR_RADIUS, CATEGORICAL, CHART, ChartCard, ChartTooltip } from '../components/charts';
 
@@ -28,6 +29,8 @@ export function ProjectDetailPage() {
   const qc = useQueryClient();
   const [tab, setTab] = useState<Tab>('overview');
   const [addMembers, setAddMembers] = useState(false);
+  const [assignManager, setAssignManager] = useState(false);
+  const [assignSales, setAssignSales] = useState(false);
 
   const query = useQuery({ queryKey: ['project', id], queryFn: () => api.get(`/projects/${id}`) });
   const p = query.data?.project;
@@ -124,6 +127,28 @@ export function ProjectDetailPage() {
                     tone={p.budgetEnabled && Number(p.budgetUtilisationPct) > 90 ? 'danger'
                       : p.budgetEnabled && Number(p.budgetUtilisationPct) > 75 ? 'warning' : undefined}
                     definition={METRIC_DEFINITIONS.budget_utilisation} />
+            </div>
+
+            {/* --- Who owns this project ---------------------------
+                Above the tabs, because an empty seat stalls everything
+                below it: no team, no activities. */}
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Seat
+                title="Sales manager"
+                holder={p.salesManagerName}
+                waitingFor="Owns the hand-over to a Project Manager."
+                blockedNote="An Admin assigns one."
+                mayAssign={can('project.assign_sales_manager')}
+                onAssign={() => setAssignSales(true)}
+                buttonLabel={p.salesManagerId ? 'Change' : 'Assign Sales Manager'} />
+              <Seat
+                title="Project manager"
+                holder={p.managerName}
+                waitingFor="Adds the technicians and assigns their activities."
+                blockedNote="The Sales Manager assigns one. Until then no team or activities can be added."
+                mayAssign={can('project.assign_manager')}
+                onAssign={() => setAssignManager(true)}
+                buttonLabel={p.managerId ? 'Change' : 'Assign Project Manager'} />
             </div>
 
             {tab === 'overview' && (
@@ -386,6 +411,20 @@ export function ProjectDetailPage() {
         )}
       </div>
 
+      {assignManager && (
+        <AssignSeatModal seat="manager" projectId={id} projectName={p?.name ?? ''}
+          currentId={p?.managerId ?? null} otherSeatId={p?.salesManagerId ?? null}
+          onClose={() => setAssignManager(false)}
+          onDone={() => { setAssignManager(false); void qc.invalidateQueries({ queryKey: ['project', id] }); }} />
+      )}
+
+      {assignSales && (
+        <AssignSeatModal seat="salesManager" projectId={id} projectName={p?.name ?? ''}
+          currentId={p?.salesManagerId ?? null} otherSeatId={p?.managerId ?? null}
+          onClose={() => setAssignSales(false)}
+          onDone={() => { setAssignSales(false); void qc.invalidateQueries({ queryKey: ['project', id] }); }} />
+      )}
+
       {addMembers && (
         <AddMembersModal projectId={id}
           existing={(query.data?.members ?? []).map((m: any) => m.userId)}
@@ -414,6 +453,148 @@ function Stat({ label, value, sub, custom, tone, definition }: {
         </>
       )}
     </div>
+  );
+}
+
+/** One of the two seats on a project, filled or not. */
+function Seat({ title, holder, waitingFor, blockedNote, mayAssign, onAssign, buttonLabel }: {
+  title: string; holder?: string | null; waitingFor: string; blockedNote: string;
+  mayAssign: boolean; onAssign: () => void; buttonLabel: string;
+}) {
+  return (
+    <Card className={holder ? undefined : 'bg-warning-soft ring-warning/30'}>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-xs font-medium uppercase tracking-wide text-ink-500">{title}</p>
+          {holder ? (
+            <p className="mt-1 font-semibold text-ink-900">{holder}</p>
+          ) : (
+            <p className="mt-1 flex items-center gap-2 font-semibold text-ink-900">
+              <Clock className="h-4 w-4 shrink-0 text-warning" aria-hidden />
+              Not assigned
+            </p>
+          )}
+          <p className="mt-1 text-sm leading-relaxed text-ink-700">
+            {holder ? waitingFor : (mayAssign ? waitingFor : blockedNote)}
+          </p>
+        </div>
+        {mayAssign && (
+          <Button variant={holder ? undefined : 'primary'} icon={<UserCheck className="h-4 w-4" />}
+                  onClick={onAssign}>
+            {buttonLabel}
+          </Button>
+        )}
+      </div>
+    </Card>
+  );
+}
+
+/**
+ * Fills either seat. Only people holding the required role are offered:
+ * the server rejects anyone else, so listing everybody would just invite
+ * an error the user cannot act on.
+ */
+function AssignSeatModal({ seat, projectId, projectName, currentId, otherSeatId, onClose, onDone }: {
+  seat: 'manager' | 'salesManager';
+  projectId: string; projectName: string;
+  currentId: string | null;
+  /** Whoever holds the other seat — they cannot hold both. */
+  otherSeatId: string | null;
+  onClose: () => void; onDone: () => void;
+}) {
+  const toast = useToast();
+  const [pickedId, setPickedId] = useState('');
+  const [note, setNote] = useState('');
+
+  const spec = {
+    manager: {
+      label: 'Project Manager', path: 'manager', field: 'managerId',
+      roles: ['ops_manager', 'sales_manager', 'super_admin'],
+      title: 'Assign Project Manager',
+      description: 'They take over the project: adding technicians and assigning their activities.',
+      hint: 'Project Managers and Sales Managers can both run a project. Whoever you pick '
+          + 'gains these powers on this project only.',
+      submit: 'Hand over',
+      done: (name: string) => [`${name} now runs ${projectName}`,
+        'They have been notified and can add technicians and assign activities.'] as const,
+      nameOf: (r: any) => r.managerName as string,
+    },
+    salesManager: {
+      label: 'Sales Manager', path: 'sales-manager', field: 'salesManagerId',
+      roles: ['sales_manager', 'super_admin'],
+      title: 'Assign Sales Manager',
+      description: 'They own this project until it is handed to a Project Manager.',
+      hint: 'Only employees holding the Sales Manager role can own a project.',
+      submit: 'Assign',
+      done: (name: string) => [`${name} now owns ${projectName}`,
+        'They have been notified and can hand it to a Project Manager.'] as const,
+      nameOf: (r: any) => r.salesManagerName as string,
+    },
+  }[seat];
+
+  const staff = useQuery({
+    queryKey: ['employees', 'all-active'],
+    queryFn: () => api.get('/employees', { size: 100, status: 'active' }),
+  });
+
+  const candidates = (staff.data?.data ?? []).filter(
+    (e: any) => spec.roles.includes(e.roleKey) && e.id !== currentId && e.id !== otherSeatId);
+
+  const assign = useMutation({
+    mutationFn: () => api.post(`/projects/${projectId}/${spec.path}`,
+      { [spec.field]: pickedId, note: note.trim() || undefined }),
+    onSuccess: (res) => {
+      const [title, body] = spec.done(spec.nameOf(res));
+      toast.success(title, body);
+      onDone();
+    },
+    onError: (err) => toast.error(`Could not assign the ${spec.label}`, (err as Error).message),
+  });
+
+  return (
+    <Modal open onClose={onClose} title={spec.title} description={spec.description}
+      footer={
+        <>
+          <Button onClick={onClose}>Cancel</Button>
+          <Button variant="primary" disabled={!pickedId} loading={assign.isPending}
+                  onClick={() => assign.mutate()}>{spec.submit}</Button>
+        </>
+      }>
+      <div className="space-y-4">
+        {candidates.length === 0 ? (
+          <p className="rounded-lg bg-warning-soft px-3.5 py-3 text-sm leading-relaxed text-ink-700 ring-1 ring-inset ring-warning/30">
+            Nobody is available to take this seat. Set someone&rsquo;s role to {spec.label} on
+            the Employees screen first — and remember one person cannot hold both seats on
+            the same project.
+          </p>
+        ) : (
+          <Field label={spec.label} required hint={spec.hint}>
+            {/* Grouped by role, because this list now mixes two of them and
+                a bare list of names would not say who is what. */}
+            <Select value={pickedId} onChange={(e) => setPickedId(e.target.value)}>
+              <option value="">Select a {spec.label}…</option>
+              {spec.roles.map((roleKey) => {
+                const inRole = candidates.filter((m: any) => m.roleKey === roleKey);
+                if (!inRole.length) return null;
+                return (
+                  <optgroup key={roleKey} label={ROLE_LABELS[roleKey as RoleKey] ?? roleKey}>
+                    {inRole.map((m: any) => (
+                      <option key={m.id} value={m.id}>{m.fullName} ({m.employeeCode})</option>
+                    ))}
+                  </optgroup>
+                );
+              })}
+            </Select>
+          </Field>
+        )}
+
+        <Field label={`Note for the ${spec.label}`}
+               hint="Optional. Included in the notification they receive.">
+          <Textarea rows={2} value={note} onChange={(e) => setNote(e.target.value)}
+                    placeholder="Client wants the survey done before the 15th." />
+        </Field>
+      </div>
+    </Modal>
   );
 }
 
