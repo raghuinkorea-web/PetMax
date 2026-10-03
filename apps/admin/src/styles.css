@@ -1,7 +1,9 @@
-@import "tailwindcss";
 /* Barlow / Barlow Condensed are used only by the sign-in screen, which follows
-   the "Industry" design system rather than the product's Inter-based one. */
+   the "Industry" design system rather than the product's Inter-based one.
+   This @import must stay above the Tailwind one: CSS drops any @import that
+   follows a rule, and the Tailwind import expands into rules. */
 @import url('https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;700&family=Barlow+Condensed:wght@400;600&display=swap');
+@import "tailwindcss";
 
 /* =====================================================================
    ADISYS FieldOps — design system

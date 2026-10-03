@@ -6,6 +6,7 @@ import { badRequest, conflict, forbidden, notFound } from '../lib/errors.js';
 import { can, principalOf, requirePermission } from '../middleware/auth.js';
 import { recordAudit } from '../services/audit.js';
 import { assertProjectMembership, scopeFor, userScopeClause } from '../services/scope.js';
+import { mayStoreLocationFor } from '../services/location.js';
 
 export const timeRouter = Router();
 
@@ -55,7 +56,15 @@ timeRouter.get('/timer', asyncHandler(async (req, res) => {
 
 timeRouter.post('/timer/start', requirePermission('time.log'), asyncHandler(async (req, res) => {
   const p = principalOf(req);
-  const body = parse(z.object({ assignmentId: uuid, notes: z.string().trim().max(500).optional() }), req.body);
+  const body = parse(z.object({
+    assignmentId: uuid,
+    notes: z.string().trim().max(500).optional(),
+    // Where the employee was when they started the job. Optional: a missing
+    // fix must never stop work from being recorded.
+    latitude: z.coerce.number().min(-90).max(90).optional(),
+    longitude: z.coerce.number().min(-180).max(180).optional(),
+    accuracyM: z.coerce.number().min(0).max(10000).optional(),
+  }), req.body);
 
   const result = await tx(async (client) => {
     const open = await one<{ id: string }>(
@@ -78,13 +87,22 @@ timeRouter.post('/timer/start', requirePermission('time.log'), asyncHandler(asyn
        VALUES ($1,$2,$3,CURRENT_DATE, now(), 'timer', $4) RETURNING id, started_at`,
       [p.id, body.assignmentId, a.project_id, body.notes ?? null], client);
 
-    // Starting the timer moves acknowledged work into progress.
+    // Starting the timer moves acknowledged work into progress. This is the
+    // transition the "Start work" button actually produces, so the employee's
+    // position is captured here rather than on the status endpoint.
     if (a.status === 'acknowledged' || a.status === 'on_hold') {
+      const consented = await mayStoreLocationFor(p.id, client);
+      const hasGeo = consented && body.latitude !== undefined && body.longitude !== undefined;
       await query(`UPDATE work_assignments SET status = 'in_progress',
                           progress_pct = GREATEST(progress_pct, 5) WHERE id = $1`, [body.assignmentId], client);
-      await query(`INSERT INTO work_assignment_events (assignment_id, actor_id, event_type, from_status, to_status, note)
-                   VALUES ($1,$2,'status_changed',$3,'in_progress','Employee started the work timer.')`,
-        [body.assignmentId, p.id, a.status], client);
+      await query(
+        `INSERT INTO work_assignment_events
+           (assignment_id, actor_id, event_type, from_status, to_status, note,
+            latitude, longitude, accuracy_m, location_consented)
+         VALUES ($1,$2,'status_changed',$3,'in_progress','Employee started the work timer.',$4,$5,$6,$7)`,
+        [body.assignmentId, p.id, a.status,
+         hasGeo ? body.latitude : null, hasGeo ? body.longitude : null,
+         hasGeo ? body.accuracyM ?? null : null, consented], client);
     }
     return entry!;
   });

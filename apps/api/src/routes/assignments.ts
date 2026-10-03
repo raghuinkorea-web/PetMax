@@ -8,6 +8,7 @@ import { can, principalOf, requirePermission } from '../middleware/auth.js';
 import { recordAudit } from '../services/audit.js';
 import { notify } from '../services/notifications.js';
 import { assertProjectMembership, scopeFor, userScopeClause } from '../services/scope.js';
+import { mayStoreLocationFor, maySeeLocationOf } from '../services/location.js';
 
 export const assignmentRouter = Router();
 
@@ -205,12 +206,25 @@ async function loadAssignment(req: any, id: string) {
 
 assignmentRouter.get('/:id', asyncHandler(async (req, res) => {
   const a = await loadAssignment(req, req.params.id);
+  // Who may see where an employee was: administrators, that employee's own
+  // reporting manager, and the employee themselves. Everyone else still gets
+  // locationRecorded as a plain yes/no, which is enough to tell that a job
+  // was geotagged without revealing the position.
+  const viewer = principalOf(req);
+  const showLocation = await maySeeLocationOf(viewer, a.assigneeId);
+
   const [events, acknowledgements, timeEntries, attachments] = await Promise.all([
     query(`SELECT e.id, e.event_type AS "eventType", e.from_status AS "fromStatus", e.to_status AS "toStatus",
                   e.note, e.changed_fields AS "changedFields", e.created_at AS "createdAt",
-                  u.full_name AS "actorName"
+                  u.full_name AS "actorName",
+                  (e.latitude IS NOT NULL) AS "locationRecorded",
+                  e.location_consented AS "locationConsented",
+                  CASE WHEN $2 THEN e.latitude   END AS latitude,
+                  CASE WHEN $2 THEN e.longitude  END AS longitude,
+                  CASE WHEN $2 THEN e.accuracy_m END AS "accuracyM"
              FROM work_assignment_events e LEFT JOIN users u ON u.id = e.actor_id
-            WHERE e.assignment_id = $1 ORDER BY e.created_at DESC, e.id DESC`, [req.params.id]),
+            WHERE e.assignment_id = $1 ORDER BY e.created_at DESC, e.id DESC`,
+      [req.params.id, showLocation]),
     query(`SELECT a.id, a.assignment_version AS "assignmentVersion", a.decision, a.mode, a.reason,
                   a.device_label AS "deviceLabel", a.acknowledged_at AS "acknowledgedAt", u.full_name AS "userName"
              FROM assignment_acknowledgements a JOIN users u ON u.id = a.user_id
@@ -632,6 +646,11 @@ const transitionSchema = z.object({
   status: z.enum(['in_progress', 'on_hold', 'submitted', 'cancelled']),
   note: z.string().trim().max(1000).optional(),
   progressPct: z.coerce.number().int().min(0).max(100).optional(),
+  // Where the employee was when they started or finished the job. Optional
+  // on purpose: a missing fix must never stop work from being recorded.
+  latitude: z.coerce.number().min(-90).max(90).optional(),
+  longitude: z.coerce.number().min(-180).max(180).optional(),
+  accuracyM: z.coerce.number().min(0).max(10000).optional(),
 });
 
 assignmentRouter.post('/:id/status', asyncHandler(async (req, res) => {
@@ -681,10 +700,22 @@ assignmentRouter.post('/:id/status', asyncHandler(async (req, res) => {
           WHERE assignment_id = $1 AND user_id = $2 AND ended_at IS NULL`, [a.id, p.id], client);
     }
 
+    // Starting and finishing a job are the two transitions a customer may
+    // later ask us to evidence, so both carry the employee's position when
+    // one is available. Consent is checked per employee, and a missing fix
+    // simply leaves the columns null rather than failing the transition.
+    const geotagged = body.status === 'in_progress' || body.status === 'submitted';
+    const consented = geotagged && await mayStoreLocationFor(p.id, client);
+    const hasGeo = consented && body.latitude !== undefined && body.longitude !== undefined;
+
     await query(
-      `INSERT INTO work_assignment_events (assignment_id, actor_id, event_type, from_status, to_status, note)
-       VALUES ($1,$2,'status_changed',$3,$4,$5)`,
-      [a.id, p.id, a.status, body.status, body.note ?? null], client);
+      `INSERT INTO work_assignment_events
+         (assignment_id, actor_id, event_type, from_status, to_status, note,
+          latitude, longitude, accuracy_m, location_consented)
+       VALUES ($1,$2,'status_changed',$3,$4,$5,$6,$7,$8,$9)`,
+      [a.id, p.id, a.status, body.status, body.note ?? null,
+       hasGeo ? body.latitude : null, hasGeo ? body.longitude : null,
+       hasGeo ? body.accuracyM ?? null : null, consented], client);
 
     if (body.status === 'submitted') {
       await notify({
@@ -700,12 +731,13 @@ assignmentRouter.post('/:id/status', asyncHandler(async (req, res) => {
         entityType: 'work_assignment', entityId: a.id, severity: 'warning',
       }, client);
     }
-    return { from: a.status, to: body.status, progressPct: progress };
+    return { from: a.status, to: body.status, progressPct: progress, locationRecorded: hasGeo };
   });
 
   await recordAudit(req, {
     action: `work.${body.status}`, entityType: 'work_assignment', entityId: req.params.id,
-    before: { status: result.from }, after: { status: result.to },
+    before: { status: result.from },
+    after: { status: result.to, locationRecorded: result.locationRecorded },
   });
   res.json({ ...result, assignment: shape(await loadAssignment(req, req.params.id)) });
 }));
